@@ -13,27 +13,27 @@ func TestRender(t *testing.T) {
 	}}
 	in := `{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/u/proj"},
 		"cost":{"total_cost_usd":0.01234},"context_window":{"used_percentage":8}}`
-	// Grille : « Opus » prend la largeur de « $0.01 », la colonne vide garde la largeur de « 8% ».
+	// Grid: "Opus" takes the width of "$0.01", the empty column keeps the width of "8%".
 	want := "\x1b[38;5;6mOpus\x1b[0m         proj\n$0.01 │ \x1b[38;5;8m8%\x1b[0m │ hi"
 	if got := render([]byte(in), cfg); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
 
-	// Ligne vide après les lignes 0 et 2 : la ligne 2 n'affiche rien, donc pas d'espace.
+	// Blank line after rows 0 and 2: row 2 shows nothing, so no gap.
 	cfg.Gaps, cfg.AirCols = []bool{true, false, true}, true
 	want = "\x1b[38;5;6mOpus\x1b[0m                 proj\n\u200b\n$0.01   │   \x1b[38;5;8m8%\x1b[0m   │   hi"
 	if got := render([]byte(in), cfg); got != want {
-		t.Errorf("aéré: got %q, want %q", got, want)
+		t.Errorf("spaced: got %q, want %q", got, want)
 	}
 	cfg.Gaps, cfg.AirCols = nil, false
 
-	// Modèle avec l'icône ✳.
+	// Model with the ✳ icon.
 	icon := Config{Rows: [][]Cell{{{Widget: "model", Icon: true}}}}
 	if got := render([]byte(in), icon); got != "✳ Opus" {
 		t.Errorf("icon: got %q", got)
 	}
 
-	// Version tirée de model.id, sans doublon si le nom en contient déjà une.
+	// Version taken from model.id, not duplicated if the name already has one.
 	for _, tc := range []struct{ json, want string }{
 		{`{"model":{"id":"claude-opus-5-5","display_name":"Opus"}}`, "✳ Opus 5.5"},
 		{`{"model":{"id":"claude-3-5-sonnet-20241022","display_name":"Sonnet"}}`, "✳ Sonnet 3.5"},
@@ -46,7 +46,7 @@ func TestRender(t *testing.T) {
 		}
 	}
 
-	// Séparateur choisi, et "space" : seulement des espaces.
+	// Chosen separator, and "space": spaces only.
 	noGit0 := Config{Rows: [][]Cell{{{Widget: "model"}, {Widget: "dir"}}}, Sep: "›"}
 	if got := render([]byte(in), noGit0); got != "Opus › proj" {
 		t.Errorf("sep: got %q", got)
@@ -56,13 +56,13 @@ func TestRender(t *testing.T) {
 		t.Errorf("sep space: got %q", got)
 	}
 
-	// Un widget sans donnée (git hors dépôt) est sauté sans laisser de blanc.
+	// A widget without data (git outside a repo) is skipped without leaving a blank.
 	noGit := Config{Rows: [][]Cell{{{Widget: "model"}, {Widget: "git"}, {Widget: "dir"}}}}
 	if got := render([]byte(in), noGit); got != "Opus │ proj" {
 		t.Errorf("widget absent: got %q", got)
 	}
 
-	// JSON vide, invalide, ou pourcentage null : seul le texte libre reste.
+	// Empty or invalid JSON, or null percentage: only the free text remains.
 	for _, in := range []string{"", "{", `{"context_window":{"used_percentage":null}}`} {
 		if got := render([]byte(in), cfg); got != "hi" {
 			t.Errorf("input %q: got %q, want %q", in, got, "hi")
@@ -78,7 +78,7 @@ func TestGridAlign(t *testing.T) {
 	}}
 	want := "Opus    │ dg-statuslines │ main\n" +
 		"ctx 23% │ 5h             │ x\n" +
-		"a" + strings.Repeat(" ", 33) + "b" // 4e colonne : 7 + 3 + 14 (Vide de 8, élargi par « dg-statuslines ») + 3 + 4 + 3
+		"a" + strings.Repeat(" ", 33) + "b" // 4th column: 7 + 3 + 14 (Spacer of 8, widened by "dg-statuslines") + 3 + 4 + 3
 	if got := render(nil, cfg); got != want {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
 	}
@@ -101,17 +101,17 @@ func TestBorder(t *testing.T) {
 }
 
 func TestTheme(t *testing.T) {
-	// Hex -> truecolor, index 256 -> 38;5, nom de palette -> son index.
+	// Hex -> truecolor, 256 index -> 38;5, palette name -> its index.
 	if got := paint("x", colorSpec("#cba6f7")); got != "\x1b[38;2;203;166;247mx\x1b[0m" {
 		t.Errorf("hex: got %q", got)
 	}
 	if got := paint("x", colorSpec("178")); got != "\x1b[38;5;178mx\x1b[0m" {
 		t.Errorf("256: got %q", got)
 	}
-	// Une jauge colorée avec l'id d'un thème utilise les seuils de ce thème.
+	// A gauge colored with a theme id uses that theme's thresholds.
 	used := 90.0
 	if got := gauge(Cell{Color: "dracula", Bar: "text", NoLabel: true}, &used, ""); got != "\x1b[38;2;255;85;85m90%\x1b[0m" {
-		t.Errorf("seuils du thème: got %q", got)
+		t.Errorf("theme thresholds: got %q", got)
 	}
 }
 
@@ -172,7 +172,7 @@ func TestCaps(t *testing.T) {
 func TestGauge(t *testing.T) {
 	used := 85.0
 	c := Cell{Widget: "limit5h", Mode: "left", Width: 4, Color: "traffic"}
-	// 15 % restant, mais rouge car 85 % utilisés.
+	// 15 % left, but red because 85 % is used.
 	want := "\x1b[2m5h\x1b[0m \x1b[38;5;1m█\x1b[0m\x1b[2m░░░\x1b[0m \x1b[38;5;1m15%\x1b[0m"
 	if got := gauge(c, &used, "5h"); got != want {
 		t.Errorf("got %q, want %q", got, want)

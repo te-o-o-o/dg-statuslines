@@ -16,41 +16,41 @@ import (
 
 const (
 	cellWidth = 14
-	minW      = 60 // en dessous : état « terminal trop petit »
+	minW      = 60 // below this: "terminal too small" state
 	minH      = 20
 )
 
-var tabNames = []string{"Disposition", "Style", "Installer"}
+var tabNames = []string{"Layout", "Style", "Install"}
 
 type pos struct{ r, c int }
 
 type drag struct {
-	from *pos // nil : vient de la palette
+	from *pos // nil: comes from the palette
 	cell Cell
 }
 
-// toastDone efface le message temporaire n, s'il n'a pas été remplacé entre-temps.
+// toastDone clears toast n, unless it has been replaced since.
 type toastDone int
 
 type model struct {
 	cfg     Config
-	saved   string // config sauvegardée (JSON), pour l'indicateur « non sauvegardé »
+	saved   string // saved config (JSON), for the "unsaved" indicator
 	sample  []byte
-	branch  string // branche affichée dans l'aperçu (calculée une fois au démarrage)
+	branch  string // branch shown in the preview (computed once at startup)
 	tab     int
 	w, h    int
 	sel     *pos
-	selRow  *int   // ligne sélectionnée par sa gouttière (L1, L2…)
-	section string // section de réglages ouverte (Couleur, Barre…)
-	scroll  int    // défilement du contenu sous l'aperçu
-	editing bool   // saisie du texte libre de la cellule sélectionnée
+	selRow  *int   // row selected via its gutter (L1, L2…)
+	section string // open settings section (Color, Bar…)
+	scroll  int    // scroll offset of the content below the preview
+	editing bool   // typing the free text of the selected cell
 	drag    *drag
-	hover   string // zone survolée pendant le drag
+	hover   string // zone hovered during the drag
 	mx, my  int
 	toast   string
 	toastN  int
 
-	// Onglet Installer, recalculé à chaque ouverture de l'onglet.
+	// Install tab, recomputed each time the tab opens.
 	plan           []byte
 	oldCmd, newCmd string
 	planErr        error
@@ -77,7 +77,7 @@ func edit() error {
 	if err != nil || len(cfg.Rows) == 0 {
 		cfg = Config{Rows: [][]Cell{make([]Cell, 4), make([]Cell, 4)}}
 	}
-	// Toutes les lignes ont le même nombre de colonnes.
+	// All rows have the same number of columns.
 	cols := 1
 	for _, r := range cfg.Rows {
 		cols = max(cols, len(r))
@@ -106,7 +106,7 @@ func edit() error {
 
 	branch := gitBranch(cwd)
 	if branch == "" {
-		branch = "main" // hors dépôt git : valeur d'exemple pour que le widget reste visible
+		branch = "main" // outside a git repo: sample value so the widget stays visible
 	}
 
 	zone.NewGlobal()
@@ -131,7 +131,7 @@ func parseCell(id string) (pos, bool) {
 	return p, err == nil
 }
 
-// hit renvoie l'id de la zone sous la souris ("" si aucune).
+// hit returns the id of the zone under the mouse ("" if none).
 func (m model) hit(msg tea.MouseMsg) string {
 	ids := []string{"tab:0", "tab:1", "tab:2", "btn:install", "palette"}
 	for r, row := range m.cfg.Rows {
@@ -143,7 +143,7 @@ func (m model) hit(msg tea.MouseMsg) string {
 	for _, w := range widgets {
 		ids = append(ids, "pal:"+w.ID)
 	}
-	for _, sec := range []string{"Couleur", "Barre", "Affichage", "Format", "Texte"} {
+	for _, sec := range []string{"Color", "Bar", "Display", "Format", "Text", "Width"} {
 		ids = append(ids, "sec:"+sec)
 	}
 	ids = append(ids, optIDs()...)
@@ -161,7 +161,7 @@ func (m model) hit(msg tea.MouseMsg) string {
 	}
 	ids = append(ids, "border:", "bcolor:")
 	ids = append(ids, "btn:+row", "btn:-row", "btn:+col", "btn:-col", "btn:airrows", "btn:aircols")
-	// Les zones imbriquées (pal:… dans palette) passent avant leur conteneur.
+	// Nested zones (pal:… inside palette) are checked before their container.
 	for _, id := range ids[5:] {
 		if zone.Get(id).InBounds(msg) {
 			return id
@@ -199,7 +199,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.scrollBy(3)
 			}
 		case tea.MouseActionMotion:
-			m.hover = hit // survol (contours roses) et cible du glisser-déposer
+			m.hover = hit // hover (pink borders) and drag-and-drop target
 		case tea.MouseActionRelease:
 			if m.drag != nil {
 				m.drop(hit)
@@ -210,7 +210,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// notify affiche un message temporaire (succès : 3 s ; erreur : jusqu'au suivant).
+// notify shows a toast (success: 3 s; error: until the next one).
 func (m *model) notify(msg string, err bool) tea.Cmd {
 	m.toastN++
 	if err {
@@ -232,24 +232,24 @@ func (m *model) setTab(t int) {
 func (m *model) save() tea.Cmd {
 	s := configJSON(m.cfg)
 	if err := os.WriteFile(configPath(), []byte(s+"\n"), 0o644); err != nil {
-		return m.notify("Sauvegarde impossible : "+err.Error(), true)
+		return m.notify("Cannot save: "+err.Error(), true)
 	}
 	m.saved = s
-	return m.notify("Sauvegardé", false)
+	return m.notify("Saved", false)
 }
 
 func (m *model) install() tea.Cmd {
 	if m.planErr != nil {
-		return m.notify("settings.json illisible : "+m.planErr.Error(), true)
+		return m.notify("settings.json unreadable: "+m.planErr.Error(), true)
 	}
 	if cmd := m.save(); m.dirty() {
-		return cmd // la sauvegarde de la config a échoué
+		return cmd // saving the config failed
 	}
 	if err := applyInstall(m.plan); err != nil {
-		return m.notify("Installation impossible : "+err.Error(), true)
+		return m.notify("Cannot install: "+err.Error(), true)
 	}
-	m.setTab(2) // relit settings.json pour mettre le statut à jour
-	return m.notify("Installé dans Claude Code", false)
+	m.setTab(2) // re-read settings.json to refresh the status
+	return m.notify("Installed in Claude Code", false)
 }
 
 func (m model) press(hit string) (tea.Model, tea.Cmd) {
@@ -321,7 +321,7 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// apply applique un choix sur la cellule sélectionnée (liste ou inspecteur).
+// apply applies a choice to the selected cell (list or inspector).
 func (m *model) apply(id string) {
 	if m.sel == nil {
 		return
@@ -359,7 +359,7 @@ func (m *model) apply(id string) {
 	}
 }
 
-// moveSel déplace la cellule sélectionnée au clavier.
+// moveSel moves the selected cell with the keyboard.
 func (m *model) moveSel(dr, dc int) {
 	if m.sel == nil {
 		m.sel, m.selRow = &pos{0, 0}, nil
@@ -374,12 +374,12 @@ func (m *model) drop(hit string) {
 	d := m.drag
 	if t, ok := parseCell(hit); ok {
 		if d.from == nil {
-			m.cfg.Rows[t.r][t.c] = d.cell // palette -> cellule (remplace)
+			m.cfg.Rows[t.r][t.c] = d.cell // palette -> cell (replaces)
 			if th, ok := themeByID(m.cfg.Theme); ok {
 				m.cfg.Rows[t.r][t.c].Color = th.color(d.cell.Widget)
 			}
 		} else if *d.from != t {
-			// cellule -> cellule : déplace, ou échange si la cible est occupée
+			// cell -> cell: move, or swap if the target is taken
 			rows := m.cfg.Rows
 			rows[t.r][t.c], rows[d.from.r][d.from.c] = rows[d.from.r][d.from.c], rows[t.r][t.c]
 		}
@@ -388,7 +388,7 @@ func (m *model) drop(hit string) {
 		return
 	}
 	if (hit == "palette" || strings.HasPrefix(hit, "pal:")) && d.from != nil {
-		m.cfg.Rows[d.from.r][d.from.c] = Cell{} // cellule -> palette : retire
+		m.cfg.Rows[d.from.r][d.from.c] = Cell{} // cell -> palette: remove
 		m.sel = nil
 	}
 }
@@ -516,7 +516,7 @@ func themeByID(id string) (theme, bool) {
 	return theme{}, false
 }
 
-// applyTheme recolore toutes les cellules et le contour (remplace les couleurs choisies à la main).
+// applyTheme recolors all cells and the border (overrides hand-picked colors).
 func (m *model) applyTheme(id string) {
 	t, ok := themeByID(id)
 	if !ok {
@@ -541,7 +541,7 @@ func (m *model) setGap(r int, on bool) {
 	m.cfg.Gaps[r] = on
 }
 
-// allGaps : une ligne vide entre chaque paire de lignes.
+// allGaps: a blank line between every pair of rows.
 func (m model) allGaps() bool {
 	for r := range len(m.cfg.Rows) - 1 {
 		if !m.gap(r) {
@@ -551,7 +551,7 @@ func (m model) allGaps() bool {
 	return len(m.cfg.Rows) > 1
 }
 
-// width : largeur utile, 80 tant que le terminal n'a pas donné sa taille.
+// width: usable width, 80 until the terminal reports its size.
 func (m model) width() int {
 	if m.w == 0 {
 		return 80
@@ -559,7 +559,7 @@ func (m model) width() int {
 	return m.w
 }
 
-// titledBox dessine un cadre gris avec un titre dans le bord haut, à la largeur w.
+// titledBox draws a gray box of width w with a title in the top edge.
 func titledBox(name, content string, w int) string {
 	edge := lipgloss.NewStyle().Foreground(edgeColor)
 	inner := w - 4
@@ -585,9 +585,9 @@ func (m model) header() string {
 	right := m.toast
 	if right == "" {
 		if m.dirty() {
-			right = warnStyle.Render("● non sauvegardé")
+			right = warnStyle.Render("● unsaved")
 		} else {
-			right = faint.Render("✓ sauvegardé")
+			right = faint.Render("✓ saved")
 		}
 	}
 	gap := max(1, m.width()-ansi.StringWidth(left)-ansi.StringWidth(right)-1)
@@ -595,8 +595,8 @@ func (m model) header() string {
 }
 
 func (m model) previewBox() string {
-	// Les cellules git deviennent du texte fixe : pas de sous-processus git à chaque frame.
-	pcfg := m.cfg // mêmes réglages globaux, lignes recopiées ci-dessous
+	// Git cells become fixed text: no git subprocess on every frame.
+	pcfg := m.cfg // same global settings, rows copied below
 	pcfg.Rows = nil
 	for _, row := range m.cfg.Rows {
 		prow := append([]Cell(nil), row...)
@@ -609,12 +609,12 @@ func (m model) previewBox() string {
 	}
 	preview := render(m.sample, pcfg)
 	if preview == "" {
-		preview = faint.Render("Glisse un widget dans la grille pour commencer.")
+		preview = faint.Render("Drag a widget onto the grid to get started.")
 	}
-	return titledBox("Aperçu", preview, m.width()-2)
+	return titledBox("Preview", preview, m.width()-2)
 }
 
-// hints affiche une ligne d'aide « touche action · touche action ».
+// hints renders a help line "key action · key action".
 func hints(pairs ...string) string {
 	var parts []string
 	for i := 0; i+1 < len(pairs); i += 2 {
@@ -626,34 +626,34 @@ func hints(pairs ...string) string {
 func (m model) footer() string {
 	switch {
 	case m.editing:
-		return hints("entrée", "terminer la saisie", "⌫", "effacer")
+		return hints("enter", "finish typing", "⌫", "erase")
 	case m.tab == 0 && m.sel != nil:
-		return hints("←↑↓→", "cellule", "[ ]", "section", "x", "retirer", "esc", "retour", "s", "sauver")
+		return hints("←↑↓→", "cell", "[ ]", "section", "x", "remove", "esc", "back", "s", "save")
 	case m.tab == 0:
-		return hints("glisser", "placer", "clic", "régler", "1-3", "onglet", "s", "sauver", "q", "quitter")
+		return hints("drag", "place", "click", "edit", "1-3", "tab", "s", "save", "q", "quit")
 	case m.tab == 1:
-		return hints("clic", "choisir", "1-3", "onglet", "s", "sauver", "q", "quitter")
+		return hints("click", "choose", "1-3", "tab", "s", "save", "q", "quit")
 	}
-	return hints("entrée", "sauvegarder et installer", "1-3", "onglet", "q", "quitter")
+	return hints("enter", "save and install", "1-3", "tab", "q", "quit")
 }
 
-// labelW : largeur de la colonne d'intitulés, commune à tous les réglages.
+// labelW: width of the label column, shared by all settings.
 const labelW = 14
 
-// field aligne un réglage : intitulé dans une colonne fixe, contrôles à droite.
+// field lays out a setting: label in a fixed column, controls on the right.
 func field(name, content string) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, faint.Width(labelW).Render(name), content)
 }
 
-// swatch : une case du quadrillage de couleurs.
+// swatch: one square of the color grid.
 type swatch struct {
-	ID     string   // valeur enregistrée ("" = couleur par défaut)
-	Colors []string // couleurs affichées côte à côte ; vide = case texte (Label)
+	ID     string   // stored value ("" = default color)
+	Colors []string // colors shown side by side; empty = text chip (Label)
 	Label  string
 }
 
-// colorItems : les 24 couleurs, puis le choix « par défaut » (dernier, pour que
-// la navigation au clavier tombe juste sur les rangées de 8).
+// colorItems: the 24 colors, then the "default" choice (last, so that
+// keyboard navigation lines up with the rows of 8).
 func colorItems(defaultLabel string) []swatch {
 	var items []swatch
 	for _, c := range colors {
@@ -662,9 +662,9 @@ func colorItems(defaultLabel string) []swatch {
 	return append(items, swatch{ID: "", Label: defaultLabel})
 }
 
-// swatchGrid dessine des carrés de couleur cliquables (zone prefix+ID), perRow par rangée,
-// une ligne vide entre les rangées. Un carré fait 2 caractères sur 1 ligne, soit un carré
-// à l'écran. Les choix sans couleur (« auto ») sont des boutons au bout de la première rangée.
+// swatchGrid draws clickable color squares (zone prefix+ID), perRow per row,
+// with a blank line between rows. A square is 2 characters on 1 line, i.e. square
+// on screen. Colorless choices ("auto") are buttons at the end of the first row.
 func swatchGrid(prefix, cur, focus string, items []swatch, perRow int) string {
 	var squares, chips []string
 	for _, it := range items {
@@ -694,7 +694,7 @@ func swatchGrid(prefix, cur, focus string, items []swatch, perRow int) string {
 	return strings.Join(rows, "\n\n")
 }
 
-// swatchCell : 2 caractères de fond par couleur ; mark (✓ choisi, ◆ focus clavier) sur la couleur du milieu.
+// swatchCell: 2 background characters per color; mark (✓ chosen, ◆ keyboard focus) on the middle color.
 func swatchCell(s swatch, mark string) string {
 	var b strings.Builder
 	for i, c := range s.Colors {
@@ -711,9 +711,9 @@ func swatchCell(s swatch, mark string) string {
 	return b.String()
 }
 
-// isLight dit si une couleur (index 256 ou #rrggbb) est claire, pour choisir
-// une coche noire ou blanche lisible dessus. Les 16 couleurs de base dépendent du
-// thème du terminal : valeurs xterm par défaut.
+// isLight tells whether a color (256 index or #rrggbb) is light, to pick
+// a readable black or white check mark on it. The 16 base colors depend on the
+// terminal theme: default xterm values.
 func isLight(spec string) bool {
 	var r, g, b int
 	if strings.HasPrefix(spec, "#") {
@@ -736,7 +736,7 @@ func isLight(spec string) bool {
 }
 
 func (m model) styleTab() string {
-	// Thèmes : 3 par ligne, noms à largeur fixe pour que les colonnes tombent juste.
+	// Themes: 3 per row, fixed-width names so the columns line up.
 	var themeRows []string
 	for i := 0; i < len(themes); i += 3 {
 		var chips []string
@@ -754,67 +754,67 @@ func (m model) styleTab() string {
 	for _, sp := range separators {
 		label := sp
 		if sp == "space" {
-			label = "espace"
+			label = "space"
 		}
 		seps = append(seps, toggle("sep:"+sp, label, m.cfg.Sep == sp || m.cfg.Sep == "" && sp == "│"))
 	}
 
-	borderChips := []string{toggle("border:", "aucun", m.cfg.Border == "")}
+	borderChips := []string{toggle("border:", "none", m.cfg.Border == "")}
 	for _, b := range borders {
 		borderChips = append(borderChips, toggle("border:"+b.ID, b.TL+b.H+b.TR, m.cfg.Border == b.ID))
 	}
 
 	parts := []string{
-		field("Thème", strings.Join(themeRows, "\n\n")), "",
-		field("Séparateur", strings.Join(seps, " ")), "",
-		field("Contour", strings.Join(borderChips, " ")),
+		field("Theme", strings.Join(themeRows, "\n\n")), "",
+		field("Separator", strings.Join(seps, " ")), "",
+		field("Border", strings.Join(borderChips, " ")),
 	}
 	if m.cfg.Border != "" {
-		parts = append(parts, field("", swatchGrid("bcolor:", m.cfg.BorderColor, "", colorItems("gris"), 8)))
+		parts = append(parts, field("", swatchGrid("bcolor:", m.cfg.BorderColor, "", colorItems("gray"), 8)))
 	}
-	parts = append(parts, "", field("Espacement",
-		toggle("btn:airrows", "ligne vide entre les lignes", m.allGaps())+" "+
-			toggle("btn:aircols", "colonnes aérées", m.cfg.AirCols)))
+	parts = append(parts, "", field("Spacing",
+		toggle("btn:airrows", "blank line between rows", m.allGaps())+" "+
+			toggle("btn:aircols", "spaced columns", m.cfg.AirCols)))
 	return strings.Join(parts, "\n")
 }
 
 func (m model) installTab() string {
 	if m.planErr != nil {
 		return m.titled(heading.Render("INSTALLATION")) + "\n\n" +
-			errStyle.Render("✗ ") + "Impossible de lire ~/.claude/settings.json : " + m.planErr.Error() + "\n" +
-			faint.Render("Corrige le fichier, puis rouvre cet onglet.")
+			errStyle.Render("✗ ") + "Cannot read ~/.claude/settings.json: " + m.planErr.Error() + "\n" +
+			faint.Render("Fix the file, then reopen this tab.")
 	}
-	status := warnStyle.Render("○ ") + "slb n'est pas encore la status line de Claude Code"
+	status := warnStyle.Render("○ ") + "slb is not yet the Claude Code status line"
 	if m.oldCmd == m.newCmd {
-		status = okStyle.Render("✓ ") + "slb est la status line de Claude Code"
+		status = okStyle.Render("✓ ") + "slb is the Claude Code status line"
 	}
-	cfgState := faint.Render("  ✓ sauvegardée")
+	cfgState := faint.Render("  ✓ saved")
 	if m.dirty() {
-		cfgState = warnStyle.Render("  ● non sauvegardée")
+		cfgState = warnStyle.Render("  ● unsaved")
 	}
 	lines := []string{
 		m.titled(heading.Render("INSTALLATION")), "",
-		faint.Render("Statut      ") + status,
+		faint.Render("Status      ") + status,
 		faint.Render("Config      ") + "~/.claude/statusline-builder.json" + cfgState,
 		"",
 	}
 	if m.oldCmd != m.newCmd {
 		lines = append(lines,
-			faint.Render("Changement prévu dans ~/.claude/settings.json"),
+			faint.Render("Planned change in ~/.claude/settings.json"),
 			"  "+errStyle.Render("- "+m.oldCmd),
 			"  "+okStyle.Render("+ "+m.newCmd),
 			"",
 		)
 	}
 	lines = append(lines,
-		zone.Mark("btn:install", button.Background(accent).Foreground(lipgloss.Color("0")).Bold(true).Render("Sauvegarder et installer")),
+		zone.Mark("btn:install", button.Background(accent).Foreground(lipgloss.Color("0")).Bold(true).Render("Save and install")),
 		"",
-		faint.Render("Une copie de settings.json est gardée dans settings.json.bak avant chaque modification."),
+		faint.Render("A copy of settings.json is kept in settings.json.bak before each change."),
 	)
 	return strings.Join(lines, "\n")
 }
 
-// bodyLines : le contenu de l'onglet, ligne par ligne, avant défilement.
+// bodyLines: the tab content, line by line, before scrolling.
 func (m model) bodyLines() []string {
 	var body string
 	switch m.tab {
@@ -825,11 +825,11 @@ func (m model) bodyLines() []string {
 	default:
 		body = m.installTab()
 	}
-	// Retrait de 2 colonnes pour aligner le contenu sur l'intérieur de l'aperçu.
+	// Indent by 2 columns to align the content with the inside of the preview.
 	return strings.Split(lipgloss.NewStyle().PaddingLeft(2).Render(body), "\n")
 }
 
-// bodyRoom : lignes disponibles pour le contenu, entre l'aperçu et l'aide.
+// bodyRoom: lines available for the content, between the preview and the help.
 func (m model) bodyRoom() int {
 	h := m.h
 	if h == 0 {
@@ -844,11 +844,11 @@ func (m *model) scrollBy(d int) {
 
 func (m model) View() string {
 	if m.w > 0 && (m.w < minW || m.h < minH) {
-		return fmt.Sprintf("\n  Terminal trop petit : %d×%d minimum (actuellement %d×%d).\n  Agrandis la fenêtre, ou %s pour quitter.",
+		return fmt.Sprintf("\n  Terminal too small: %d×%d minimum (currently %d×%d).\n  Enlarge the window, or press %s to quit.",
 			minW, minH, m.w, m.h, keyStyle.Render("q"))
 	}
 
-	// En-tête et aperçu fixes, contenu qui défile, aide en bas.
+	// Fixed header and preview, scrolling content, help at the bottom.
 	top := strings.Join([]string{m.header(), "", m.previewBox(), ""}, "\n")
 	bl := m.bodyLines()
 	room := m.bodyRoom()
@@ -861,7 +861,7 @@ func (m model) View() string {
 	if more := len(bl) - off - room; more > 0 || off > 0 {
 		help = faint.Render(fmt.Sprintf(" ↕ %d/%d ·", off+room, len(bl))) + help
 	}
-	// Un seul zone.Scan pour tout l'écran : chaque Scan efface les zones du précédent.
+	// A single zone.Scan for the whole screen: each Scan clears the previous one's zones.
 	view := zone.Scan(top + "\n" + strings.Join(shown, "\n") + "\n" + help)
 	lines := strings.Split(view, "\n")
 	for i, l := range lines {
@@ -875,7 +875,7 @@ func (m model) View() string {
 	return view
 }
 
-// overlay pose fg sur la ligne y de bg à partir de la colonne x (label qui suit le curseur).
+// overlay draws fg on line y of bg starting at column x (label following the cursor).
 func overlay(bg, fg string, x, y int) string {
 	lines := strings.Split(bg, "\n")
 	if y < 0 || y >= len(lines) {

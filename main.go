@@ -13,7 +13,7 @@ func main() {
 	}
 	switch os.Args[1] {
 	case "render":
-		// Ne jamais planter ni sortir en erreur : Claude Code afficherait une ligne vide.
+		// Never crash or exit with an error: Claude Code would show a blank line.
 		defer func() { recover() }()
 		in, _ := io.ReadAll(os.Stdin)
 		cfg, _ := loadConfig()

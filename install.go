@@ -18,12 +18,12 @@ type kv struct {
 	Value json.RawMessage
 }
 
-// parseObject lit les clés de premier niveau en gardant leur ordre,
-// pour réécrire settings.json sans tout réordonner.
+// parseObject reads the top-level keys in order,
+// so settings.json can be rewritten without reordering it.
 func parseObject(b []byte) ([]kv, error) {
 	dec := json.NewDecoder(bytes.NewReader(b))
 	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
-		return nil, errors.New("settings.json n'est pas un objet JSON")
+		return nil, errors.New("settings.json is not a JSON object")
 	}
 	var out []kv
 	for dec.More() {
@@ -48,8 +48,8 @@ func indent(v []byte) string {
 	return buf.String()
 }
 
-// planInstall calcule le nouveau settings.json et renvoie l'ancienne et la nouvelle
-// commande de status line. Seule statusLine change ; les autres clés sont recopiées telles quelles.
+// planInstall computes the new settings.json and returns the old and new
+// status line commands. Only statusLine changes; other keys are copied as is.
 func planInstall() (newContent []byte, oldCmd, newCmd string, err error) {
 	exe, err := os.Executable()
 	if err != nil {
@@ -75,7 +75,7 @@ func planInstall() (newContent []byte, oldCmd, newCmd string, err error) {
 		}
 	}
 
-	oldCmd = "(aucune)"
+	oldCmd = "(none)"
 	found := false
 	for i, p := range pairs {
 		if p.Key == "statusLine" {
