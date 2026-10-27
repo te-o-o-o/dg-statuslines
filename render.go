@@ -41,6 +41,7 @@ type Config struct {
 	Border      string   `json:"border,omitempty"`       // border around the whole status line ("" = none)
 	BorderColor string   `json:"border_color,omitempty"` // "" = dim gray
 	Theme       string   `json:"theme,omitempty"`        // last applied theme, also used for widgets added later
+	UI          string   `json:"ui,omitempty"`           // builder appearance ("" = auto); no effect on the render
 }
 
 // Widget id -> label shown in the builder (palette order).
