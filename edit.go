@@ -41,9 +41,9 @@ type model struct {
 	w, h    int
 	sel     *pos
 	selRow  *int   // ligne sélectionnée par sa gouttière (L1, L2…)
-	pop     string // liste de choix ouverte ("" = aucune)
-	popIdx  int
-	editing bool // saisie du texte libre de la cellule sélectionnée
+	section string // section de réglages ouverte (Couleur, Barre…)
+	scroll  int    // défilement du contenu sous l'aperçu
+	editing bool   // saisie du texte libre de la cellule sélectionnée
 	drag    *drag
 	hover   string // zone survolée pendant le drag
 	mx, my  int
@@ -110,7 +110,7 @@ func edit() error {
 	}
 
 	zone.NewGlobal()
-	_, err = tea.NewProgram(model{cfg: cfg, saved: saved, sample: sample, branch: branch}, tea.WithAltScreen(), tea.WithMouseCellMotion()).Run()
+	_, err = tea.NewProgram(model{cfg: cfg, saved: saved, sample: sample, branch: branch}, tea.WithAltScreen(), tea.WithMouseAllMotion()).Run()
 	return err
 }
 
@@ -133,39 +133,41 @@ func parseCell(id string) (pos, bool) {
 
 // hit renvoie l'id de la zone sous la souris ("" si aucune).
 func (m model) hit(msg tea.MouseMsg) string {
-	ids := []string{"tab:0", "tab:1", "tab:2", "btn:install"}
-	if m.pop != "" {
-		// Liste ouverte : seuls ses choix sont cliquables, le reste la ferme.
-		for _, it := range m.popItems() {
-			ids = append(ids, it.ID)
+	ids := []string{"tab:0", "tab:1", "tab:2", "btn:install", "palette"}
+	for r, row := range m.cfg.Rows {
+		ids = append(ids, fmt.Sprintf("row:%d", r), fmt.Sprintf("gap:%d", r))
+		for c := range row {
+			ids = append(ids, cellID(r, c))
 		}
-	} else {
-		for r, row := range m.cfg.Rows {
-			ids = append(ids, fmt.Sprintf("row:%d", r), fmt.Sprintf("gap:%d", r))
-			for c := range row {
-				ids = append(ids, cellID(r, c))
-			}
-		}
-		for _, w := range widgets {
-			ids = append(ids, "pal:"+w.ID)
-		}
-		ids = append(ids, inspIDs...)
-		for _, sp := range separators {
-			ids = append(ids, "sep:"+sp)
-		}
-		for _, t := range themes {
-			ids = append(ids, "theme:"+t.ID)
-		}
-		for _, b := range borders {
-			ids = append(ids, "border:"+b.ID)
-		}
-		for _, c := range colors {
-			ids = append(ids, "bcolor:"+c.Name)
-		}
-		ids = append(ids, "border:", "bcolor:")
-		ids = append(ids, "btn:+row", "btn:-row", "btn:+col", "btn:-col", "btn:airrows", "btn:aircols", "palette")
 	}
-	for _, id := range ids {
+	for _, w := range widgets {
+		ids = append(ids, "pal:"+w.ID)
+	}
+	for _, sec := range []string{"Couleur", "Barre", "Affichage", "Format", "Texte"} {
+		ids = append(ids, "sec:"+sec)
+	}
+	ids = append(ids, optIDs()...)
+	for _, sp := range separators {
+		ids = append(ids, "sep:"+sp)
+	}
+	for _, t := range themes {
+		ids = append(ids, "theme:"+t.ID)
+	}
+	for _, b := range borders {
+		ids = append(ids, "border:"+b.ID)
+	}
+	for _, c := range colors {
+		ids = append(ids, "bcolor:"+c.Name)
+	}
+	ids = append(ids, "border:", "bcolor:")
+	ids = append(ids, "btn:+row", "btn:-row", "btn:+col", "btn:-col", "btn:airrows", "btn:aircols")
+	// Les zones imbriquées (pal:… dans palette) passent avant leur conteneur.
+	for _, id := range ids[5:] {
+		if zone.Get(id).InBounds(msg) {
+			return id
+		}
+	}
+	for _, id := range ids[:5] {
 		if zone.Get(id).InBounds(msg) {
 			return id
 		}
@@ -188,13 +190,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		hit := m.hit(msg)
 		switch msg.Action {
 		case tea.MouseActionPress:
-			if msg.Button == tea.MouseButtonLeft {
+			switch msg.Button {
+			case tea.MouseButtonLeft:
 				return m.press(hit)
+			case tea.MouseButtonWheelUp:
+				m.scrollBy(-3)
+			case tea.MouseButtonWheelDown:
+				m.scrollBy(3)
 			}
 		case tea.MouseActionMotion:
-			if m.drag != nil {
-				m.hover = hit
-			}
+			m.hover = hit // survol (contours roses) et cible du glisser-déposer
 		case tea.MouseActionRelease:
 			if m.drag != nil {
 				m.drop(hit)
@@ -218,7 +223,7 @@ func (m *model) notify(msg string, err bool) tea.Cmd {
 }
 
 func (m *model) setTab(t int) {
-	m.tab, m.editing = t, false
+	m.tab, m.editing, m.scroll = t, false, 0
 	if t == 2 {
 		m.plan, m.oldCmd, m.newCmd, m.planErr = planInstall()
 	}
@@ -249,13 +254,6 @@ func (m *model) install() tea.Cmd {
 
 func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	m.editing = false
-	if m.pop != "" {
-		if hit != "" && !strings.HasPrefix(hit, "tab:") {
-			m.apply(hit)
-		}
-		m.pop = ""
-		return m, nil
-	}
 	if p, ok := parseCell(hit); ok {
 		m.selRow = nil
 		if c := m.cfg.Rows[p.r][p.c]; c.Widget != "" {
@@ -271,10 +269,8 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 		m.sel, m.selRow = nil, &r
 	case hit == "insp:text":
 		m.editing = true
-	case strings.HasPrefix(hit, "insp:"):
-		m.openPop(strings.TrimPrefix(hit, "insp:"))
-	case hit == "btn:remove" && m.sel != nil:
-		m.cfg.Rows[m.sel.r][m.sel.c] = Cell{}
+	case strings.HasPrefix(hit, "sec:"):
+		m.section = strings.TrimPrefix(hit, "sec:")
 	case strings.HasPrefix(hit, "color:"), strings.HasPrefix(hit, "opt:"):
 		m.apply(hit)
 	case strings.HasPrefix(hit, "tab:"):
@@ -415,29 +411,6 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
-	if m.pop != "" {
-		items := m.popItems()
-		step := map[string]int{"up": -1, "down": 1, "left": -1, "right": 1}
-		if m.pop == "color" {
-			step["up"], step["down"] = -8, 8 // rangées de 8 carrés
-		} else if rows := popRows(len(items)); rows < len(items) {
-			step["left"], step["right"] = -rows, rows // deux colonnes
-		}
-		switch k := msg.String(); k {
-		case "up", "down", "left", "right":
-			if n := len(items); n > 0 {
-				m.popIdx = ((m.popIdx+step[k])%n + n) % n
-			}
-		case "enter", " ":
-			if m.popIdx < len(items) {
-				m.apply(items[m.popIdx].ID)
-			}
-			m.pop = ""
-		case "esc", "q":
-			m.pop = ""
-		}
-		return m, nil
-	}
 	if m.tab == 0 {
 		switch msg.String() {
 		case "up":
@@ -452,10 +425,8 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "right":
 			m.moveSel(0, 1)
 			return m, nil
-		case "a", "enter":
-			if c := m.selCell(); c != nil && (c.Widget == "" || msg.String() == "a") {
-				m.openPop("widget")
-			} else if c != nil && c.Widget == "text" {
+		case "enter":
+			if c := m.selCell(); c != nil && c.Widget == "text" {
 				m.editing = true
 			}
 			return m, nil
@@ -464,14 +435,20 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.cfg.Rows[m.sel.r][m.sel.c] = Cell{}
 			}
 			return m, nil
-		case "c":
+		case "[", "]":
 			if c := m.selCell(); c != nil && c.Widget != "" {
-				m.openPop("color")
-			}
-			return m, nil
-		case "b":
-			if c := m.selCell(); c != nil && isGauge(c.Widget) {
-				m.openPop("bar")
+				secs := sections(c)
+				i := 0
+				for k, sec := range secs {
+					if sec == m.curSection() {
+						i = k
+					}
+				}
+				d := 1
+				if msg.String() == "[" {
+					d = -1
+				}
+				m.section = secs[(i+d+len(secs))%len(secs)]
 			}
 			return m, nil
 		}
@@ -487,6 +464,10 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.setTab((m.tab + len(tabNames) - 1) % len(tabNames))
 	case "esc":
 		m.sel, m.selRow = nil, nil
+	case "pgdown":
+		m.scrollBy(m.bodyRoom() - 2)
+	case "pgup":
+		m.scrollBy(-(m.bodyRoom() - 2))
 	case "s":
 		return m, m.save()
 	case "i":
@@ -614,13 +595,6 @@ func (m model) header() string {
 }
 
 func (m model) previewBox() string {
-	// Liste ouverte : l'aperçu montre le choix sous le focus, sans le valider.
-	if items := m.popItems(); m.pop != "" && m.popIdx < len(items) {
-		trial := m
-		trial.cfg = cloneCfg(m.cfg)
-		trial.apply(items[m.popIdx].ID)
-		m.cfg = trial.cfg
-	}
 	// Les cellules git deviennent du texte fixe : pas de sous-processus git à chaque frame.
 	pcfg := m.cfg // mêmes réglages globaux, lignes recopiées ci-dessous
 	pcfg.Rows = nil
@@ -653,12 +627,10 @@ func (m model) footer() string {
 	switch {
 	case m.editing:
 		return hints("entrée", "terminer la saisie", "⌫", "effacer")
-	case m.pop != "":
-		return hints("↑↓←→", "naviguer", "entrée", "choisir", "esc", "fermer")
 	case m.tab == 0 && m.sel != nil:
-		return hints("←↑↓→", "cellule", "a", "ajouter", "x", "retirer", "c", "couleur", "esc", "retour", "s", "sauver")
+		return hints("←↑↓→", "cellule", "[ ]", "section", "x", "retirer", "esc", "retour", "s", "sauver")
 	case m.tab == 0:
-		return hints("glisser", "placer", "←↑↓→", "cellule", "1-3", "onglet", "s", "sauver", "q", "quitter")
+		return hints("glisser", "placer", "clic", "régler", "1-3", "onglet", "s", "sauver", "q", "quitter")
 	case m.tab == 1:
 		return hints("clic", "choisir", "1-3", "onglet", "s", "sauver", "q", "quitter")
 	}
@@ -666,7 +638,7 @@ func (m model) footer() string {
 }
 
 // labelW : largeur de la colonne d'intitulés, commune à tous les réglages.
-const labelW = 12
+const labelW = 14
 
 // field aligne un réglage : intitulé dans une colonne fixe, contrôles à droite.
 func field(name, content string) string {
@@ -808,7 +780,7 @@ func (m model) styleTab() string {
 
 func (m model) installTab() string {
 	if m.planErr != nil {
-		return heading.Render("INSTALLATION") + "\n\n" +
+		return m.titled(heading.Render("INSTALLATION")) + "\n\n" +
 			errStyle.Render("✗ ") + "Impossible de lire ~/.claude/settings.json : " + m.planErr.Error() + "\n" +
 			faint.Render("Corrige le fichier, puis rouvre cet onglet.")
 	}
@@ -821,7 +793,7 @@ func (m model) installTab() string {
 		cfgState = warnStyle.Render("  ● non sauvegardée")
 	}
 	lines := []string{
-		heading.Render("INSTALLATION"), "",
+		m.titled(heading.Render("INSTALLATION")), "",
 		faint.Render("Statut      ") + status,
 		faint.Render("Config      ") + "~/.claude/statusline-builder.json" + cfgState,
 		"",
@@ -842,12 +814,8 @@ func (m model) installTab() string {
 	return strings.Join(lines, "\n")
 }
 
-func (m model) View() string {
-	if m.w > 0 && (m.w < minW || m.h < minH) {
-		return fmt.Sprintf("\n  Terminal trop petit : %d×%d minimum (actuellement %d×%d).\n  Agrandis la fenêtre, ou %s pour quitter.",
-			minW, minH, m.w, m.h, keyStyle.Render("q"))
-	}
-
+// bodyLines : le contenu de l'onglet, ligne par ligne, avant défilement.
+func (m model) bodyLines() []string {
 	var body string
 	switch m.tab {
 	case 0:
@@ -858,39 +826,44 @@ func (m model) View() string {
 		body = m.installTab()
 	}
 	// Retrait de 2 colonnes pour aligner le contenu sur l'intérieur de l'aperçu.
-	body = lipgloss.NewStyle().PaddingLeft(2).Render(body)
+	return strings.Split(lipgloss.NewStyle().PaddingLeft(2).Render(body), "\n")
+}
 
-	preview := m.previewBox()
-	content := strings.Join([]string{m.header(), "", preview, "", body}, "\n")
-	if m.pop != "" {
-		// Liste ouverte : sous l'aperçu (qui reste lisible pour voir l'essai), le reste
-		// s'atténue (ses zones disparaissent avec ansi.Strip) et la liste se pose dessus.
-		// Un seul zone.Scan : chaque Scan efface les zones du précédent.
-		pv := m.popView()
-		top := 2 + lipgloss.Height(preview) + 1
-		ls := strings.Split(content, "\n")
-		for i := top - 1; i < len(ls); i++ {
-			ls[i] = faint.Render(ansi.Strip(ls[i]))
-		}
-		for len(ls) < top+lipgloss.Height(pv) {
-			ls = append(ls, "")
-		}
-		content = overlayBlock(strings.Join(ls, "\n"), pv, max(0, (m.width()-lipgloss.Width(pv))/2), top)
+// bodyRoom : lignes disponibles pour le contenu, entre l'aperçu et l'aide.
+func (m model) bodyRoom() int {
+	h := m.h
+	if h == 0 {
+		h = 24
 	}
-	view := zone.Scan(content)
+	return max(3, h-3-lipgloss.Height(m.previewBox())-1)
+}
 
-	// Hauteur : l'aide reste en bas ; ce qui dépasse est coupé, avec un indicateur.
+func (m *model) scrollBy(d int) {
+	m.scroll = min(max(0, m.scroll+d), max(0, len(m.bodyLines())-m.bodyRoom()))
+}
+
+func (m model) View() string {
+	if m.w > 0 && (m.w < minW || m.h < minH) {
+		return fmt.Sprintf("\n  Terminal trop petit : %d×%d minimum (actuellement %d×%d).\n  Agrandis la fenêtre, ou %s pour quitter.",
+			minW, minH, m.w, m.h, keyStyle.Render("q"))
+	}
+
+	// En-tête et aperçu fixes, contenu qui défile, aide en bas.
+	top := strings.Join([]string{m.header(), "", m.previewBox(), ""}, "\n")
+	bl := m.bodyLines()
+	room := m.bodyRoom()
+	off := min(m.scroll, max(0, len(bl)-room))
+	shown := bl[off:min(len(bl), off+room)]
+	for len(shown) < room {
+		shown = append(shown, "")
+	}
+	help := m.footer()
+	if more := len(bl) - off - room; more > 0 || off > 0 {
+		help = faint.Render(fmt.Sprintf(" ↕ %d/%d ·", off+room, len(bl))) + help
+	}
+	// Un seul zone.Scan pour tout l'écran : chaque Scan efface les zones du précédent.
+	view := zone.Scan(top + "\n" + strings.Join(shown, "\n") + "\n" + help)
 	lines := strings.Split(view, "\n")
-	if m.h > 0 {
-		room := m.h - 1
-		if len(lines) > room {
-			lines = append(lines[:room-1], faint.Render("  ↓ suite masquée, agrandis le terminal"))
-		}
-		for len(lines) < room {
-			lines = append(lines, "")
-		}
-	}
-	lines = append(lines, m.footer())
 	for i, l := range lines {
 		lines[i] = ansi.Truncate(l, m.width(), "")
 	}

@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestRender(t *testing.T) {
 	cfg := Config{Rows: [][]Cell{
@@ -10,14 +13,15 @@ func TestRender(t *testing.T) {
 	}}
 	in := `{"model":{"display_name":"Opus"},"workspace":{"current_dir":"/home/u/proj"},
 		"cost":{"total_cost_usd":0.01234},"context_window":{"used_percentage":8}}`
-	want := "\x1b[38;5;6mOpus\x1b[0m      proj\n$0.01 │ \x1b[38;5;8m8%\x1b[0m │ hi"
+	// Grille : « Opus » prend la largeur de « $0.01 », la colonne vide garde la largeur de « 8% ».
+	want := "\x1b[38;5;6mOpus\x1b[0m         proj\n$0.01 │ \x1b[38;5;8m8%\x1b[0m │ hi"
 	if got := render([]byte(in), cfg); got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
 
 	// Ligne vide après les lignes 0 et 2 : la ligne 2 n'affiche rien, donc pas d'espace.
 	cfg.Gaps, cfg.AirCols = []bool{true, false, true}, true
-	want = "\x1b[38;5;6mOpus\x1b[0m              proj\n​\n$0.01   │   \x1b[38;5;8m8%\x1b[0m   │   hi"
+	want = "\x1b[38;5;6mOpus\x1b[0m                 proj\n\u200b\n$0.01   │   \x1b[38;5;8m8%\x1b[0m   │   hi"
 	if got := render([]byte(in), cfg); got != want {
 		t.Errorf("aéré: got %q, want %q", got, want)
 	}
@@ -63,6 +67,20 @@ func TestRender(t *testing.T) {
 		if got := render([]byte(in), cfg); got != "hi" {
 			t.Errorf("input %q: got %q, want %q", in, got, "hi")
 		}
+	}
+}
+
+func TestGridAlign(t *testing.T) {
+	cfg := Config{Rows: [][]Cell{
+		{{Widget: "text", Text: "Opus"}, {Widget: "text", Text: "dg-statuslines"}, {Widget: "text", Text: "main"}},
+		{{Widget: "text", Text: "ctx 23%"}, {Widget: "text", Text: "5h"}, {Widget: "text", Text: "x"}},
+		{{Widget: "text", Text: "a"}, {Widget: "spacer", Width: 8}, {}, {Widget: "text", Text: "b"}},
+	}}
+	want := "Opus    │ dg-statuslines │ main\n" +
+		"ctx 23% │ 5h             │ x\n" +
+		"a" + strings.Repeat(" ", 33) + "b" // 4e colonne : 7 + 3 + 14 (Vide de 8, élargi par « dg-statuslines ») + 3 + 4 + 3
+	if got := render(nil, cfg); got != want {
+		t.Errorf("got\n%s\nwant\n%s", got, want)
 	}
 }
 
