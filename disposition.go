@@ -71,6 +71,10 @@ func (m model) layoutTab() string {
 	for _, p := range presets {
 		ps = append(ps, toggle("preset:"+p.ID, p.Label, false))
 	}
+	ps = append(ps, " ", toggle("preset:random", "⚄ Random", false))
+	if m.rollIdx > 0 {
+		ps = append(ps, toggle("preset:prev", "↶ Previous", false))
+	}
 	parts := []string{
 		m.titled(heading.Render("PRESETS")), faint.Render("Start from a ready-made layout. It replaces the current grid and style."), "",
 		strings.Join(ps, " "), "", "",
