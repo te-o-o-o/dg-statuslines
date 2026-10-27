@@ -29,6 +29,7 @@ type Cell struct {
 	Icon    bool   `json:"icon,omitempty"`    // model: ✳ prefix like the old statusline-command.sh
 	Version bool   `json:"version,omitempty"` // model: append the version taken from model.id
 	Align   string `json:"align,omitempty"`   // position in its column: "" (left), "center", "right"
+	Sep     string `json:"sep,omitempty"`     // separator after this cell ("" = the global one)
 }
 
 type Config struct {
@@ -512,18 +513,29 @@ func cellValue(c Cell, s session) string {
 func render(input []byte, cfg Config) string {
 	var s session
 	_ = json.Unmarshal(input, &s)
-	ch, pad := cfg.Sep, " "
-	switch ch {
-	case "":
-		ch = "│"
-	case "space":
-		ch = ""
-	}
+	pad := " "
 	if cfg.AirCols {
 		pad = "   "
 	}
-	sep := pad + ch + pad
-	sepW := ansi.StringWidth(sep)
+	// Every separator is one character between two pads, so all have the same width
+	// and columns stay aligned whatever separator each cell picks.
+	mkSep := func(id string) string {
+		switch id {
+		case "":
+			id = "│"
+		case "space":
+			id = " "
+		}
+		return pad + id + pad
+	}
+	global := mkSep(cfg.Sep)
+	sepAfter := func(c Cell) string {
+		if c.Sep == "" {
+			return global
+		}
+		return mkSep(c.Sep)
+	}
+	sepW := ansi.StringWidth(global)
 
 	// CSS-like grid: each column takes the width of its widest cell.
 	// An empty cell (or a widget without data) leaves a blank as wide as its
@@ -557,6 +569,7 @@ func render(input []byte, cfg Config) string {
 	for i, row := range cfg.Rows {
 		var b strings.Builder
 		any, prev, first := false, false, true
+		prevK := -1 // last column written: its cell picks the separator that follows it
 		rowW := widths
 		if cfg.free(i) {
 			rowW = make([]int, len(row))
@@ -574,12 +587,12 @@ func render(input []byte, cfg Config) string {
 			}
 			if !first {
 				if prev && v != "" {
-					b.WriteString(sep)
+					b.WriteString(sepAfter(row[prevK]))
 				} else {
 					b.WriteString(strings.Repeat(" ", sepW))
 				}
 			}
-			first, prev = false, v != ""
+			first, prev, prevK = false, v != "", k
 			any = any || prev
 			align := ""
 			if k < len(cfg.Rows[i]) {

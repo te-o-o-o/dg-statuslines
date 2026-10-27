@@ -42,6 +42,7 @@ type model struct {
 	w, h    int
 	sel     *pos
 	selRow  *int   // row selected via its gutter (L1, L2…)
+	selSep  *pos   // separator slot selected: the one after this cell
 	section string // open settings section (Color, Bar…)
 	scroll  int    // scroll offset of the content below the preview
 	rng     *rand.Rand
@@ -141,7 +142,7 @@ func (m model) hit(msg tea.MouseMsg) string {
 	for r, row := range m.cfg.Rows {
 		ids = append(ids, fmt.Sprintf("row:%d", r), fmt.Sprintf("gap:%d", r), fmt.Sprintf("free:%d", r))
 		for c := range row {
-			ids = append(ids, cellID(r, c))
+			ids = append(ids, cellID(r, c), sepSlotID(r, c))
 		}
 	}
 	for _, w := range widgets {
@@ -152,8 +153,9 @@ func (m model) hit(msg tea.MouseMsg) string {
 	}
 	ids = append(ids, optIDs()...)
 	for _, sp := range separators {
-		ids = append(ids, "sep:"+sp)
+		ids = append(ids, "sep:"+sp, "cellsep:"+sp)
 	}
+	ids = append(ids, "cellsep:")
 	for _, t := range themes {
 		ids = append(ids, "theme:"+t.ID)
 	}
@@ -263,7 +265,7 @@ func (m *model) install() tea.Cmd {
 func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	m.editing = false
 	if p, ok := parseCell(hit); ok {
-		m.selRow = nil
+		m.selRow, m.selSep = nil, nil
 		if c := m.cfg.Rows[p.r][p.c]; c.Widget != "" {
 			m.drag = &drag{from: &p, cell: c}
 		} else {
@@ -274,7 +276,13 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	switch {
 	case strings.HasPrefix(hit, "row:"):
 		r, _ := strconv.Atoi(strings.TrimPrefix(hit, "row:"))
-		m.sel, m.selRow = nil, &r
+		m.sel, m.selRow, m.selSep = nil, &r, nil
+	case strings.HasPrefix(hit, "sepslot:"):
+		var p pos
+		fmt.Sscanf(hit, "sepslot:%d:%d", &p.r, &p.c)
+		m.sel, m.selRow, m.selSep = nil, nil, &p
+	case strings.HasPrefix(hit, "cellsep:") && m.selSep != nil:
+		m.cfg.Rows[m.selSep.r][m.selSep.c].Sep = strings.TrimPrefix(hit, "cellsep:")
 	case hit == "insp:text":
 		m.editing = true
 	case strings.HasPrefix(hit, "sec:"):
@@ -314,7 +322,7 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	case strings.HasPrefix(hit, "preset:"):
 		for _, p := range presets {
 			if "preset:"+p.ID == hit {
-				m.cfg, m.sel, m.selRow = p.build(), nil, nil
+				m.cfg, m.sel, m.selRow, m.selSep = p.build(), nil, nil, nil
 				return m, m.notify(p.Label+" applied · s to save", false)
 			}
 		}
@@ -346,6 +354,9 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	}
 	if m.selRow != nil && *m.selRow >= len(m.cfg.Rows) {
 		m.selRow = nil
+	}
+	if m.selSep != nil && (m.selSep.r >= len(m.cfg.Rows) || m.selSep.c >= len(m.cfg.Rows[0])-1) {
+		m.selSep = nil
 	}
 	return m, nil
 }
@@ -393,7 +404,7 @@ func (m *model) apply(id string) {
 // moveSel moves the selected cell with the keyboard.
 func (m *model) moveSel(dr, dc int) {
 	if m.sel == nil {
-		m.sel, m.selRow = &pos{0, 0}, nil
+		m.sel, m.selRow, m.selSep = &pos{0, 0}, nil, nil
 		return
 	}
 	r := min(max(m.sel.r+dr, 0), len(m.cfg.Rows)-1)
@@ -414,7 +425,7 @@ func (m *model) drop(hit string) {
 			rows := m.cfg.Rows
 			rows[t.r][t.c], rows[d.from.r][d.from.c] = rows[d.from.r][d.from.c], rows[t.r][t.c]
 		}
-		m.sel = &t
+		m.sel, m.selSep = &t, nil
 		m.editing = m.cfg.Rows[t.r][t.c].Widget == "text"
 		return
 	}
@@ -494,7 +505,7 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "shift+tab":
 		m.setTab((m.tab + len(tabNames) - 1) % len(tabNames))
 	case "esc":
-		m.sel, m.selRow = nil, nil
+		m.sel, m.selRow, m.selSep = nil, nil, nil
 	case "pgdown":
 		m.scrollBy(m.bodyRoom() - 2)
 	case "pgup":
@@ -640,7 +651,7 @@ func (m model) previewBox() string {
 		prow := append([]Cell(nil), row...)
 		for i, c := range prow {
 			if c.Widget == "git" {
-				prow[i] = Cell{Widget: "text", Text: m.branch, Color: c.Color}
+				prow[i].Widget, prow[i].Text = "text", m.branch // keeps color, alignment and separator
 			}
 		}
 		pcfg.Rows = append(pcfg.Rows, prow)

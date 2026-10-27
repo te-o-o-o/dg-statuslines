@@ -52,7 +52,7 @@ func TestRender(t *testing.T) {
 		t.Errorf("sep: got %q", got)
 	}
 	noGit0.Sep = "space"
-	if got := render([]byte(in), noGit0); got != "Opus  proj" {
+	if got := render([]byte(in), noGit0); got != "Opus   proj" {
 		t.Errorf("sep space: got %q", got)
 	}
 
@@ -108,6 +108,18 @@ func TestFreeRow(t *testing.T) {
 	want := "~/a/very/long/path │ main\n" +
 		"Opus    │ $0.42\n" +
 		"ctx 23% │ 5h"
+	if got := render(nil, cfg); got != want {
+		t.Errorf("got\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestCellSeparator(t *testing.T) {
+	cfg := Config{Sep: "·", Rows: [][]Cell{
+		{{Widget: "text", Text: "a", Sep: "›"}, {Widget: "text", Text: "b"}, {Widget: "text", Text: "c", Sep: "space"}, {Widget: "text", Text: "d"}},
+		{{Widget: "text", Text: "w"}, {Widget: "text", Text: "x", Sep: "/"}, {Widget: "text", Text: "y"}, {Widget: "text", Text: "z"}},
+	}}
+	// Each cell picks what follows it; the others inherit "·". Same widths keep columns aligned.
+	want := "a › b · c   d\nw · x / y · z"
 	if got := render(nil, cfg); got != want {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
 	}
