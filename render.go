@@ -106,9 +106,16 @@ var schemes = map[string][3]string{
 	"cyans":   {"123", "51", "30"},
 	"fire":    {"220", "208", "196"},
 	"violets": {"183", "141", "93"},
+	// Funky ones.
+	"neon":      {"#39ff14", "#ffff33", "#ff073a"},
+	"vaporwave": {"#00ffff", "#ff71ce", "#b967ff"},
+	"aurora":    {"#5fffaf", "#5fafff", "#d75fff"},
+	"lava":      {"#ffd700", "#ff5f00", "#d70000"},
+	"candy":     {"#87d7ff", "#ff87d7", "#ff5f87"},
+	"matrix":    {"#00ff41", "#00cc33", "#008f11"},
 }
 
-var schemeOrder = []string{"traffic", "cyans", "fire", "violets"}
+var schemeOrder = []string{"traffic", "cyans", "fire", "violets", "neon", "vaporwave", "aurora", "lava", "candy", "matrix"}
 
 // Themes: one color per widget, gauge thresholds and border color.
 // Colors as 256 index or #rrggbb (official theme palettes).
