@@ -58,7 +58,7 @@ const gapChipW = 27
 // cardW: card width, shrunk so the grid and its buttons fit in the terminal.
 func (m model) cardW() int {
 	n := len(m.cfg.Rows[0])
-	return min(17, max(10, (m.width()-2-4-(n-1)-gapChipW)/n))
+	return min(17, max(10, (m.width()-2-4-(n-1)*3-gapChipW)/n))
 }
 
 func (m model) layoutTab() string {
@@ -96,7 +96,7 @@ func (m model) cardsView() string {
 		cards := []string{zone.Mark(fmt.Sprintf("row:%d", r), gst.Render(g)) + strings.Repeat(" ", 4-len(g))}
 		for c := range row {
 			if c > 0 {
-				cards = append(cards, " ")
+				cards = append(cards, m.sepSlot(r, c-1))
 			}
 			cards = append(cards, m.card(r, c))
 		}
@@ -110,6 +110,30 @@ func (m model) cardsView() string {
 	}
 	return strings.Join(rows, "\n")
 }
+
+// sepSlot is the clickable gap after cell (r, c): it shows the separator rendered there,
+// grey when inherited from the Style tab, pink when picked for this spot.
+func (m model) sepSlot(r, c int) string {
+	id := m.cfg.Rows[r][c].Sep
+	glyph, st := m.cfg.Sep, faint
+	if id != "" {
+		glyph, st = id, lipgloss.NewStyle().Foreground(accent).Bold(true)
+	}
+	switch glyph {
+	case "":
+		glyph = "│"
+	case "space":
+		glyph = "␣"
+	}
+	if m.selSep != nil && *m.selSep == (pos{r, c}) {
+		st = selStyle
+	} else if m.drag == nil && m.hover == sepSlotID(r, c) {
+		st = st.Foreground(accent)
+	}
+	return zone.Mark(sepSlotID(r, c), st.Render(" "+glyph+" "))
+}
+
+func sepSlotID(r, c int) string { return fmt.Sprintf("sepslot:%d:%d", r, c) }
 
 func (m model) card(r, c int) string {
 	cell := m.cfg.Rows[r][c]
@@ -225,6 +249,24 @@ func chips(opts ...opt) string {
 }
 
 func (m model) settingsView() string {
+	if p := m.selSep; p != nil {
+		cur := m.cfg.Rows[p.r][p.c].Sep
+		inherited := m.cfg.Sep
+		if inherited == "" {
+			inherited = "│"
+		}
+		var o []opt
+		o = append(o, opt{"cellsep:", "inherit " + inherited, cur == ""})
+		for _, sp := range separators {
+			name := sp
+			if sp == "space" {
+				name = "space"
+			}
+			o = append(o, opt{"cellsep:" + sp, name, cur == sp})
+		}
+		return m.titled(heading.Render("SEPARATOR")+faint.Render(fmt.Sprintf("  row %d · after column %d", p.r+1, p.c+1))) + "\n\n" +
+			chips(o...) + "\n\n" + faint.Render("inherit follows the separator chosen in the Style tab.")
+	}
 	if m.selRow != nil {
 		r := *m.selRow
 		return m.titled(heading.Render(fmt.Sprintf("ROW %d", r+1))) + "\n\n" +

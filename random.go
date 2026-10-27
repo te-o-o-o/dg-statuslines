@@ -128,7 +128,7 @@ func (m *model) roll() {
 	c := randomConfig(m.rng)
 	m.rolls = append(m.rolls[:m.rollIdx+min(1, len(m.rolls))], c)
 	m.rollIdx = len(m.rolls) - 1
-	m.cfg, m.sel, m.selRow = cloneConfig(c), nil, nil
+	m.cfg, m.sel, m.selRow, m.selSep = cloneConfig(c), nil, nil, nil
 }
 
 // prevRoll goes back to the previous roll, if any.
@@ -137,6 +137,6 @@ func (m *model) prevRoll() bool {
 		return false
 	}
 	m.rollIdx--
-	m.cfg, m.sel, m.selRow = cloneConfig(m.rolls[m.rollIdx]), nil, nil
+	m.cfg, m.sel, m.selRow, m.selSep = cloneConfig(m.rolls[m.rollIdx]), nil, nil, nil
 	return true
 }
