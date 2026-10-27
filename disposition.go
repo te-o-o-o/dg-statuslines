@@ -53,7 +53,7 @@ func (m model) selCell() *Cell {
 }
 
 // gapChipW: room for the "blank line" button at the end of each grid row.
-const gapChipW = 16
+const gapChipW = 27
 
 // cardW: card width, shrunk so the grid and its buttons fit in the terminal.
 func (m model) cardW() int {
@@ -100,7 +100,8 @@ func (m model) cardsView() string {
 			}
 			cards = append(cards, m.card(r, c))
 		}
-		cards = append(cards, "  ", toggle(fmt.Sprintf("gap:%d", r), "↵ blank line", m.gap(r)))
+		cards = append(cards, "  ", toggle(fmt.Sprintf("gap:%d", r), "↵ blank line", m.gap(r)),
+			" ", toggle(fmt.Sprintf("free:%d", r), "off grid", m.cfg.free(r)))
 		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Center, cards...))
 		if m.gap(r) {
 			w := len(row)*(m.cardW()+1) - 1

@@ -98,6 +98,21 @@ func TestAlign(t *testing.T) {
 	}
 }
 
+func TestFreeRow(t *testing.T) {
+	cfg := Config{Free: []bool{true}, Rows: [][]Cell{
+		{{Widget: "text", Text: "~/a/very/long/path"}, {Widget: "text", Text: "main"}},
+		{{Widget: "text", Text: "Opus"}, {Widget: "text", Text: "$0.42"}},
+		{{Widget: "text", Text: "ctx 23%"}, {Widget: "text", Text: "5h"}},
+	}}
+	// Row 1 is off the grid: the long path widens nothing, rows 2 and 3 align together.
+	want := "~/a/very/long/path │ main\n" +
+		"Opus    │ $0.42\n" +
+		"ctx 23% │ 5h"
+	if got := render(nil, cfg); got != want {
+		t.Errorf("got\n%s\nwant\n%s", got, want)
+	}
+}
+
 func TestBorder(t *testing.T) {
 	cfg := Config{Border: "rounded", Gaps: []bool{true}, Rows: [][]Cell{
 		{{Widget: "text", Text: "Opus"}, {Widget: "text", Text: "main"}},

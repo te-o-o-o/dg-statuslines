@@ -34,6 +34,7 @@ type Cell struct {
 type Config struct {
 	Rows        [][]Cell `json:"rows"`
 	Gaps        []bool   `json:"gaps,omitempty"`         // Gaps[i]: blank line after row i
+	Free        []bool   `json:"free,omitempty"`         // Free[i]: row i is off the grid (its own widths)
 	AirCols     bool     `json:"air_cols,omitempty"`     // more space between cells
 	Sep         string   `json:"sep,omitempty"`          // separator between cells ("" = │, "space" = none)
 	Border      string   `json:"border,omitempty"`       // border around the whole status line ("" = none)
@@ -59,6 +60,8 @@ var widgets = []struct{ ID, Label string }{
 }
 
 func isGauge(w string) bool { return w == "context" || w == "limit5h" || w == "limit7d" }
+
+func (c Config) free(i int) bool { return i < len(c.Free) && c.Free[i] }
 
 // alignIn pads v to width w, placing it left, center or right (like CSS justify-self).
 func alignIn(v string, w int, align string) string {
@@ -526,27 +529,42 @@ func render(input []byte, cfg Config) string {
 	// An empty cell (or a widget without data) leaves a blank as wide as its
 	// column, with no separator; a column empty on every row disappears,
 	// unless a Spacer widget forces a width on it.
+	// A row off the grid neither sets nor follows the column widths: its cells take
+	// their own width, so a long value there pushes nothing on the other rows.
 	vals := make([][]string, len(cfg.Rows))
+	cellW := func(c Cell, v string) int {
+		if c.Widget == "spacer" {
+			return max(ansi.StringWidth(v), spacerWidth(c))
+		}
+		return ansi.StringWidth(v)
+	}
 	var widths []int
 	for i, row := range cfg.Rows {
 		vals[i] = make([]string, len(row))
 		for k, c := range row {
+			vals[i][k] = cellValue(c, s)
+			if cfg.free(i) {
+				continue
+			}
 			for len(widths) <= k {
 				widths = append(widths, 0)
 			}
-			vals[i][k] = cellValue(c, s)
-			widths[k] = max(widths[k], ansi.StringWidth(vals[i][k]))
-			if c.Widget == "spacer" {
-				widths[k] = max(widths[k], spacerWidth(c))
-			}
+			widths[k] = max(widths[k], cellW(c, vals[i][k]))
 		}
 	}
 
 	var lines []string
-	for i := range cfg.Rows {
+	for i, row := range cfg.Rows {
 		var b strings.Builder
 		any, prev, first := false, false, true
-		for k, w := range widths {
+		rowW := widths
+		if cfg.free(i) {
+			rowW = make([]int, len(row))
+			for k, c := range row {
+				rowW[k] = cellW(c, vals[i][k])
+			}
+		}
+		for k, w := range rowW {
 			if w == 0 {
 				continue
 			}
