@@ -1,0 +1,5 @@
+# Built binary: rebuilt with go build -o slb .
+/slb
+
+# Local tooling notes and settings, not part of the project.
+/.claude
