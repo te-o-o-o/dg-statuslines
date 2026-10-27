@@ -12,12 +12,6 @@ import (
 	zone "github.com/lrstanley/bubblezone"
 )
 
-// groupStyle sets the widget group names apart, softly: blue, away from the pink
-// selection and the gold Random button.
-var groupStyle = lipgloss.NewStyle().Width(10).Foreground(lipgloss.Color("110"))
-
-var selStyle = lipgloss.NewStyle().Background(accent).Foreground(lipgloss.Color("0")).Bold(true)
-
 var widgetGroups = []struct {
 	Name string
 	IDs  []string
@@ -72,9 +66,9 @@ func (m model) layoutTab() string {
 		toggle("btn:+col", "+ column", false), " ",
 		toggle("btn:-col", "− column", false))
 	// Random comes first, in gold: the quickest way to a starting point.
-	random := lipgloss.NewStyle().Padding(0, 1).Bold(true).Background(lipgloss.Color("220")).Foreground(lipgloss.Color("0"))
+	random := lipgloss.NewStyle().Padding(0, 1).Bold(true).Background(randomBg).Foreground(lipgloss.Color("0"))
 	if m.drag == nil && m.hover == "preset:random" {
-		random = random.Background(lipgloss.Color("228"))
+		random = random.Background(randomHover)
 	}
 	roll := []string{zone.Mark("preset:random", random.Render("⚄ Random"))}
 	if m.rollIdx > 0 {
@@ -404,7 +398,7 @@ func (m model) titled(title string) string {
 	if rule < 2 {
 		return title
 	}
-	return title + " " + lipgloss.NewStyle().Foreground(lipgloss.Color("237")).Render(strings.Repeat("─", rule))
+	return title + " " + lipgloss.NewStyle().Foreground(ruleColor).Render(strings.Repeat("─", rule))
 }
 
 func barLabel(id string) string {

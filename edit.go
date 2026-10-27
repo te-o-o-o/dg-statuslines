@@ -62,17 +62,11 @@ type model struct {
 }
 
 var (
-	accent    = lipgloss.Color("212")
-	edgeColor = lipgloss.Color("240")
-	faint     = lipgloss.NewStyle().Faint(true)
 	title     = lipgloss.NewStyle().Bold(true)
-	heading   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("245"))
 	keyStyle  = lipgloss.NewStyle().Bold(true)
 	okStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	warnStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 	errStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	button    = lipgloss.NewStyle().Padding(0, 1).Background(lipgloss.Color("237"))
-	dragLabel = lipgloss.NewStyle().Padding(0, 1).Background(accent).Foreground(lipgloss.Color("0"))
 	box       = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
 )
 
@@ -114,6 +108,8 @@ func edit() error {
 		branch = "main" // outside a git repo: sample value so the widget stays visible
 	}
 
+	darkTerminal = lipgloss.HasDarkBackground()
+	applyUI(cfg.UI)
 	zone.NewGlobal()
 	_, err = tea.NewProgram(model{cfg: cfg, saved: saved, sample: sample, branch: branch}, tea.WithAltScreen(), tea.WithMouseAllMotion()).Run()
 	return err
@@ -162,7 +158,7 @@ func (m model) hit(msg tea.MouseMsg) string {
 	for _, p := range presets {
 		ids = append(ids, "preset:"+p.ID)
 	}
-	ids = append(ids, "preset:random", "preset:prev")
+	ids = append(ids, "preset:random", "preset:prev", "ui:", "ui:ocean", "ui:paper")
 	for _, b := range borders {
 		ids = append(ids, "border:"+b.ID)
 	}
@@ -326,6 +322,9 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 				return m, m.notify(p.Label+" applied · s to save", false)
 			}
 		}
+	case strings.HasPrefix(hit, "ui:"):
+		m.cfg.UI = strings.TrimPrefix(hit, "ui:")
+		applyUI(m.cfg.UI)
 	case strings.HasPrefix(hit, "theme:"):
 		m.applyTheme(strings.TrimPrefix(hit, "theme:"))
 	case strings.HasPrefix(hit, "sep:"):
@@ -547,7 +546,7 @@ func colorOf(name string) lipgloss.Style {
 
 func toggleStyle(on bool) lipgloss.Style {
 	if on {
-		return button.Background(accent).Foreground(lipgloss.Color("0"))
+		return button.Background(accent).Foreground(onAccent)
 	}
 	return button
 }
@@ -813,7 +812,14 @@ func (m model) styleTab() string {
 		borderChips = append(borderChips, toggle("border:"+b.ID, b.TL+b.H+b.TR, m.cfg.Border == b.ID))
 	}
 
+	auto := "auto (dark)"
+	if !darkTerminal {
+		auto = "auto (light)"
+	}
+	app := chips(opt{"ui:", auto, m.cfg.UI == ""}, opt{"ui:ocean", "Ocean", m.cfg.UI == "ocean"}, opt{"ui:paper", "Paper", m.cfg.UI == "paper"}) +
+		faint.Render("   colours of slb itself")
 	parts := []string{
+		field("App", app), "",
 		field("Theme", strings.Join(themeRows, "\n\n")), "",
 		field("Separator", strings.Join(seps, " ")), "",
 		field("Border", strings.Join(borderChips, " ")),
@@ -856,7 +862,7 @@ func (m model) installTab() string {
 		)
 	}
 	lines = append(lines,
-		zone.Mark("btn:install", button.Background(accent).Foreground(lipgloss.Color("0")).Bold(true).Render("Save and install")),
+		zone.Mark("btn:install", button.Background(accent).Foreground(onAccent).Bold(true).Render("Save and install")),
 		"",
 		faint.Render("A copy of settings.json is kept in settings.json.bak before each change."),
 	)
