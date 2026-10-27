@@ -84,6 +84,20 @@ func TestGridAlign(t *testing.T) {
 	}
 }
 
+func TestAlign(t *testing.T) {
+	cfg := Config{Rows: [][]Cell{
+		{{Widget: "text", Text: "dg-statuslines"}, {Widget: "text", Text: "x"}},
+		{{Widget: "text", Text: "main", Align: "right"}, {Widget: "text", Text: "y"}},
+		{{Widget: "text", Text: "mid", Align: "center"}, {Widget: "text", Text: "z"}},
+	}}
+	want := "dg-statuslines │ x\n" +
+		"          main │ y\n" +
+		"     mid       │ z"
+	if got := render(nil, cfg); got != want {
+		t.Errorf("got\n%s\nwant\n%s", got, want)
+	}
+}
+
 func TestBorder(t *testing.T) {
 	cfg := Config{Border: "rounded", Gaps: []bool{true}, Rows: [][]Cell{
 		{{Widget: "text", Text: "Opus"}, {Widget: "text", Text: "main"}},

@@ -143,7 +143,7 @@ func (m model) hit(msg tea.MouseMsg) string {
 	for _, w := range widgets {
 		ids = append(ids, "pal:"+w.ID)
 	}
-	for _, sec := range []string{"Color", "Bar", "Display", "Format", "Text", "Width"} {
+	for _, sec := range []string{"Color", "Bar", "Display", "Format", "Text", "Width", "Align"} {
 		ids = append(ids, "sec:"+sec)
 	}
 	ids = append(ids, optIDs()...)
@@ -363,6 +363,8 @@ func (m *model) apply(id string) {
 			c.Version = v == "yes"
 		case "icon":
 			c.Icon = v == "yes"
+		case "align":
+			c.Align = v
 		case "full":
 			c.Full = v == "yes"
 		}
@@ -780,7 +782,7 @@ func (m model) styleTab() string {
 		field("Border", strings.Join(borderChips, " ")),
 	}
 	if m.cfg.Border != "" {
-		parts = append(parts, field("", swatchGrid("bcolor:", m.cfg.BorderColor, "", colorItems("gray"), 8)))
+		parts = append(parts, "", field("", swatchGrid("bcolor:", m.cfg.BorderColor, "", colorItems("gray"), 8)))
 	}
 	parts = append(parts, "", field("Spacing",
 		toggle("btn:airrows", "blank line between rows", m.allGaps())+" "+
