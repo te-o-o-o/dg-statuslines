@@ -67,7 +67,14 @@ func (m model) layoutTab() string {
 		toggle("btn:-row", "− row", false), "   ",
 		toggle("btn:+col", "+ column", false), " ",
 		toggle("btn:-col", "− column", false))
-	parts := []string{m.titled(heading.Render("GRID")), "", m.cardsView(), "", "    " + btns, "", "", m.widgetsView()}
+	var ps []string
+	for _, p := range presets {
+		ps = append(ps, toggle("preset:"+p.ID, p.Label, false))
+	}
+	parts := []string{
+		m.titled(heading.Render("PRESETS")), faint.Render("Start from a ready-made layout. It replaces the current grid and style."), "",
+		strings.Join(ps, " "), "", "",
+		m.titled(heading.Render("GRID")), "", m.cardsView(), "", "    " + btns, "", "", m.widgetsView()}
 	if s := m.settingsView(); s != "" {
 		parts = append(parts, "", "", s)
 	}
