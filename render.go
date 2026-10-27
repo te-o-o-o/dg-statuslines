@@ -167,12 +167,18 @@ func (t theme) color(widget string) string {
 
 // Available separators; "space" = spaces only.
 // Status line borders: top-left, top-right, bottom-left, bottom-right corners, horizontal, vertical.
-var borders = []struct{ ID, TL, TR, BL, BR, H, V string }{
-	{"rounded", "╭", "╮", "╰", "╯", "─", "│"},
-	{"square", "┌", "┐", "└", "┘", "─", "│"},
-	{"double", "╔", "╗", "╚", "╝", "═", "║"},
-	{"heavy", "┏", "┓", "┗", "┛", "━", "┃"},
-	{"ascii", "+", "+", "+", "+", "-", "|"},
+// B and R are the bottom and right edges when they differ from H and V (block frame).
+var borders = []struct{ ID, TL, TR, BL, BR, H, V, B, R string }{
+	{"rounded", "╭", "╮", "╰", "╯", "─", "│", "", ""},
+	{"square", "┌", "┐", "└", "┘", "─", "│", "", ""},
+	{"double", "╔", "╗", "╚", "╝", "═", "║", "", ""},
+	{"heavy", "┏", "┓", "┗", "┛", "━", "┃", "", ""},
+	{"dashed", "╭", "╮", "╰", "╯", "╌", "╎", "", ""},
+	{"dotted", "┌", "┐", "└", "┘", "┈", "┊", "", ""},
+	{"dots", "·", "·", "·", "·", "·", "·", "", ""},
+	{"block", "▛", "▜", "▙", "▟", "▀", "▌", "▄", "▐"},
+	{"corners", "┌", "┐", "└", "┘", " ", " ", "", ""},
+	{"ascii", "+", "+", "+", "+", "-", "|", "", ""},
 }
 
 var separators = []string{"│", "|", "┃", "·", "•", "/", "›", "»", "◆", "⋮", "space"}
@@ -630,14 +636,21 @@ func frame(lines []string, cfg Config) []string {
 		for _, l := range lines {
 			w = max(w, ansi.StringWidth(l))
 		}
+		bottom, right := b.B, b.R
+		if bottom == "" {
+			bottom = b.H
+		}
+		if right == "" {
+			right = b.V
+		}
 		out := []string{edge(b.TL + strings.Repeat(b.H, w+2) + b.TR)}
 		for _, l := range lines {
 			if l == "\u200b" {
 				l = ""
 			}
-			out = append(out, edge(b.V)+" "+l+strings.Repeat(" ", w-ansi.StringWidth(l))+" "+edge(b.V))
+			out = append(out, edge(b.V)+" "+l+strings.Repeat(" ", w-ansi.StringWidth(l))+" "+edge(right))
 		}
-		return append(out, edge(b.BL+strings.Repeat(b.H, w+2)+b.BR))
+		return append(out, edge(b.BL+strings.Repeat(bottom, w+2)+b.BR))
 	}
 	return lines
 }
