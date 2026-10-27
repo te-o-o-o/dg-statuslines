@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/charmbracelet/x/ansi"
 )
@@ -55,9 +54,18 @@ var widgets = []struct{ ID, Label string }{
 	{"reset5h", "Reset 5h"},
 	{"reset7d", "Reset 7j"},
 	{"text", "Texte"},
+	{"spacer", "Vide"},
 }
 
 func isGauge(w string) bool { return w == "context" || w == "limit5h" || w == "limit7d" }
+
+// spacerWidth : largeur réservée par un widget « Vide » (Width, 4 par défaut).
+func spacerWidth(c Cell) int {
+	if c.Width == 0 {
+		return 4
+	}
+	return c.Width
+}
 
 // Couleurs proposées : nom -> index de la palette 256 couleurs.
 // 15 couleurs ANSI (normales puis vives) et 9 nuances de la palette 256.
@@ -491,39 +499,58 @@ func render(input []byte, cfg Config) string {
 		pad = "   "
 	}
 	sep := pad + ch + pad
-	var lines []string
+	sepW := ansi.StringWidth(sep)
+
+	// Grille façon CSS : chaque colonne prend la largeur de sa cellule la plus large.
+	// Une cellule vide (ou un widget sans donnée) laisse un blanc de la largeur de sa
+	// colonne, sans séparateur ; une colonne vide sur toutes les lignes disparaît,
+	// sauf si un widget « Vide » lui impose une largeur.
+	vals := make([][]string, len(cfg.Rows))
+	var widths []int
 	for i, row := range cfg.Rows {
-		// Une cellule vide entre deux widgets devient un blanc (sans séparateur) de la
-		// largeur de deux séparateurs, et un de plus par cellule vide supplémentaire.
-		// Un widget sans donnée est simplement sauté, il ne crée pas de blanc.
-		var line string
-		empty := 0
-		for _, c := range row {
-			if c.Widget == "" {
-				empty++
+		vals[i] = make([]string, len(row))
+		for k, c := range row {
+			for len(widths) <= k {
+				widths = append(widths, 0)
+			}
+			vals[i][k] = cellValue(c, s)
+			widths[k] = max(widths[k], ansi.StringWidth(vals[i][k]))
+			if c.Widget == "spacer" {
+				widths[k] = max(widths[k], spacerWidth(c))
+			}
+		}
+	}
+
+	var lines []string
+	for i := range cfg.Rows {
+		var b strings.Builder
+		any, prev, first := false, false, true
+		for k, w := range widths {
+			if w == 0 {
 				continue
 			}
-			v := cellValue(c, s)
-			if v == "" {
-				continue
+			v := ""
+			if k < len(vals[i]) {
+				v = vals[i][k]
 			}
-			if line != "" {
-				if empty == 0 {
-					line += sep
+			if !first {
+				if prev && v != "" {
+					b.WriteString(sep)
 				} else {
-					line += strings.Repeat(" ", utf8.RuneCountInString(sep)*(empty+1))
+					b.WriteString(strings.Repeat(" ", sepW))
 				}
 			}
-			line += v
-			empty = 0
+			first, prev = false, v != ""
+			any = any || prev
+			b.WriteString(v + strings.Repeat(" ", w-ansi.StringWidth(v)))
 		}
-		if line == "" {
+		if !any {
 			continue // ligne sans donnée : ni la ligne ni son espace
 		}
-		lines = append(lines, line)
+		lines = append(lines, strings.TrimRight(b.String(), " "))
 		if i < len(cfg.Gaps) && cfg.Gaps[i] {
 			// Espace de largeur nulle plutôt qu'une ligne vide, comme dans l'ancien statusline-command.sh.
-			lines = append(lines, "​")
+			lines = append(lines, "\u200b")
 		}
 	}
 	return strings.Join(frame(lines, cfg), "\n")
