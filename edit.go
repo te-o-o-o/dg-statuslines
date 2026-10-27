@@ -41,7 +41,6 @@ type model struct {
 	tab     int
 	w, h    int
 	sel     *pos
-	selRow  *int   // row selected via its gutter (L1, L2…)
 	selSep  *pos   // separator slot selected: the one after this cell
 	section string // open settings section (Color, Bar…)
 	scroll  int    // scroll offset of the content below the preview
@@ -136,7 +135,7 @@ func parseCell(id string) (pos, bool) {
 func (m model) hit(msg tea.MouseMsg) string {
 	ids := []string{"tab:0", "tab:1", "tab:2", "btn:install", "palette"}
 	for r, row := range m.cfg.Rows {
-		ids = append(ids, fmt.Sprintf("row:%d", r), fmt.Sprintf("gap:%d", r), fmt.Sprintf("free:%d", r))
+		ids = append(ids, fmt.Sprintf("gap:%d", r), fmt.Sprintf("free:%d", r))
 		for c := range row {
 			ids = append(ids, cellID(r, c), sepSlotID(r, c))
 		}
@@ -144,7 +143,7 @@ func (m model) hit(msg tea.MouseMsg) string {
 	for _, w := range widgets {
 		ids = append(ids, "pal:"+w.ID)
 	}
-	for _, sec := range []string{"Color", "Bar", "Display", "Format", "Text", "Width", "Align"} {
+	for _, sec := range sectionNames {
 		ids = append(ids, "sec:"+sec)
 	}
 	ids = append(ids, optIDs()...)
@@ -261,7 +260,7 @@ func (m *model) install() tea.Cmd {
 func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	m.editing = false
 	if p, ok := parseCell(hit); ok {
-		m.selRow, m.selSep = nil, nil
+		m.selSep = nil
 		if c := m.cfg.Rows[p.r][p.c]; c.Widget != "" {
 			m.drag = &drag{from: &p, cell: c}
 		} else {
@@ -270,13 +269,10 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch {
-	case strings.HasPrefix(hit, "row:"):
-		r, _ := strconv.Atoi(strings.TrimPrefix(hit, "row:"))
-		m.sel, m.selRow, m.selSep = nil, &r, nil
 	case strings.HasPrefix(hit, "sepslot:"):
 		var p pos
 		fmt.Sscanf(hit, "sepslot:%d:%d", &p.r, &p.c)
-		m.sel, m.selRow, m.selSep = nil, nil, &p
+		m.sel, m.selSep = nil, &p
 	case strings.HasPrefix(hit, "cellsep:") && m.selSep != nil:
 		m.cfg.Rows[m.selSep.r][m.selSep.c].Sep = strings.TrimPrefix(hit, "cellsep:")
 	case hit == "insp:text":
@@ -318,7 +314,7 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	case strings.HasPrefix(hit, "preset:"):
 		for _, p := range presets {
 			if "preset:"+p.ID == hit {
-				m.cfg, m.sel, m.selRow, m.selSep = p.build(), nil, nil, nil
+				m.cfg, m.sel, m.selSep = p.build(), nil, nil
 				return m, m.notify(p.Label+" applied · s to save", false)
 			}
 		}
@@ -350,9 +346,6 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	}
 	if m.sel != nil && (m.sel.r >= len(m.cfg.Rows) || m.sel.c >= len(m.cfg.Rows[0])) {
 		m.sel = nil
-	}
-	if m.selRow != nil && *m.selRow >= len(m.cfg.Rows) {
-		m.selRow = nil
 	}
 	if m.selSep != nil && (m.selSep.r >= len(m.cfg.Rows) || m.selSep.c >= len(m.cfg.Rows[0])-1) {
 		m.selSep = nil
@@ -403,7 +396,7 @@ func (m *model) apply(id string) {
 // moveSel moves the selected cell with the keyboard.
 func (m *model) moveSel(dr, dc int) {
 	if m.sel == nil {
-		m.sel, m.selRow, m.selSep = &pos{0, 0}, nil, nil
+		m.sel, m.selSep = &pos{0, 0}, nil
 		return
 	}
 	r := min(max(m.sel.r+dr, 0), len(m.cfg.Rows)-1)
@@ -504,7 +497,7 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "shift+tab":
 		m.setTab((m.tab + len(tabNames) - 1) % len(tabNames))
 	case "esc":
-		m.sel, m.selRow, m.selSep = nil, nil, nil
+		m.sel, m.selSep = nil, nil
 	case "pgdown":
 		m.scrollBy(m.bodyRoom() - 2)
 	case "pgup":
@@ -570,11 +563,16 @@ func (m *model) applyTheme(id string) {
 	if !ok {
 		return
 	}
-	m.cfg.Theme, m.cfg.BorderColor = id, t.Border
-	for r := range m.cfg.Rows {
-		for c := range m.cfg.Rows[r] {
-			if w := m.cfg.Rows[r][c].Widget; w != "" {
-				m.cfg.Rows[r][c].Color = t.color(w)
+	recolor(&m.cfg, t)
+}
+
+// recolor applies a theme: every widget gets its colour, and the border its own.
+func recolor(cfg *Config, t theme) {
+	cfg.Theme, cfg.BorderColor = t.ID, t.Border
+	for r := range cfg.Rows {
+		for c := range cfg.Rows[r] {
+			if w := cfg.Rows[r][c].Widget; w != "" {
+				cfg.Rows[r][c].Color = t.color(w)
 			}
 		}
 	}
@@ -713,17 +711,15 @@ func colorItems(defaultLabel string) []swatch {
 // swatchGrid draws clickable color squares (zone prefix+ID), perRow per row,
 // with a blank line between rows. A square is 2 characters on 1 line, i.e. square
 // on screen. Colorless choices ("auto") are buttons at the end of the first row.
-func swatchGrid(prefix, cur, focus string, items []swatch, perRow int) string {
+func swatchGrid(prefix, cur string, items []swatch, perRow int) string {
 	var squares, chips []string
 	for _, it := range items {
 		var cell string
 		switch {
 		case len(it.Colors) == 0:
-			cell = toggleStyle(it.ID == cur).Underline(it.ID == focus && focus != "").Render(it.Label)
+			cell = toggleStyle(it.ID == cur).Render(it.Label)
 			chips = append(chips, zone.Mark(prefix+it.ID, cell))
 			continue
-		case it.ID == focus && focus != "":
-			cell = swatchCell(it, "◆")
 		case it.ID == cur:
 			cell = swatchCell(it, "✓")
 		default:
@@ -742,7 +738,7 @@ func swatchGrid(prefix, cur, focus string, items []swatch, perRow int) string {
 	return strings.Join(rows, "\n\n")
 }
 
-// swatchCell: 2 background characters per color; mark (✓ chosen, ◆ keyboard focus) on the middle color.
+// swatchCell: 2 background characters per color; mark (✓ chosen) on the middle color.
 func swatchCell(s swatch, mark string) string {
 	var b strings.Builder
 	for i, c := range s.Colors {
@@ -825,7 +821,7 @@ func (m model) styleTab() string {
 		field("Border", strings.Join(borderChips, " ")),
 	}
 	if m.cfg.Border != "" {
-		parts = append(parts, "", field("", swatchGrid("bcolor:", m.cfg.BorderColor, "", colorItems("gray"), 8)))
+		parts = append(parts, "", field("", swatchGrid("bcolor:", m.cfg.BorderColor, colorItems("gray"), 8)))
 	}
 	parts = append(parts, "", field("Spacing",
 		toggle("btn:airrows", "blank line between rows", m.allGaps())+" "+

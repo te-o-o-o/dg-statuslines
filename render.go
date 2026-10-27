@@ -408,8 +408,6 @@ func modelVersion(id string) string {
 	return strings.Join(nums, ".")
 }
 
-var weekdays = [...]string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
-
 func humanize(d time.Duration) string {
 	s := max(int(d.Seconds()), 0)
 	switch {
@@ -430,7 +428,7 @@ func reset(c Cell, w *rateWindow, label string, withDay bool) string {
 	t := time.Unix(int64(*w.ResetsAt), 0)
 	at := t.Format("15:04")
 	if withDay {
-		at = weekdays[t.Weekday()] + " " + at
+		at = t.Format("Mon 15:04")
 	}
 	return dim(label) + " " + paint(at, colorSpec(c.Color)) + " " + dim("("+humanize(time.Until(t))+")")
 }

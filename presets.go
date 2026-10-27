@@ -50,14 +50,7 @@ func grid(themeID string, cfg Config, rows ...[]Cell) Config {
 		cfg.Rows = append(cfg.Rows, append(r, make([]Cell, n-len(r))...))
 	}
 	if t, ok := themeByID(themeID); ok {
-		cfg.Theme, cfg.BorderColor = t.ID, t.Border
-		for i := range cfg.Rows {
-			for k := range cfg.Rows[i] {
-				if w := cfg.Rows[i][k].Widget; w != "" {
-					cfg.Rows[i][k].Color = t.color(w)
-				}
-			}
-		}
+		recolor(&cfg, t)
 	}
 	return cfg
 }
