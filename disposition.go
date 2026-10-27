@@ -26,7 +26,7 @@ var widgetGroups = []struct {
 
 // optIDs: all clickable choices in the sections (fixed zones).
 func optIDs() []string {
-	ids := []string{"opt:mode:", "opt:mode:left", "opt:width:1", "opt:width:2", "opt:width:4",
+	ids := []string{"opt:align:", "opt:align:center", "opt:align:right", "opt:mode:", "opt:mode:left", "opt:width:1", "opt:width:2", "opt:width:4",
 		"opt:width:5", "opt:width:8", "opt:width:10", "opt:width:15", "opt:width:16",
 		"opt:label:on", "opt:label:off", "opt:icon:yes", "opt:icon:no",
 		"opt:version:yes", "opt:version:no", "opt:full:yes", "opt:full:no", "insp:text", "color:"}
@@ -123,7 +123,12 @@ func (m model) card(r, c int) string {
 			text = faint.Render(ansi.Truncate(fmt.Sprintf("␣ spacer %d", spacerWidth(cell)), w-2, "…"))
 		}
 	}
-	st := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(edgeColor).Width(w - 2).Align(lipgloss.Center)
+	// The card text follows the cell alignment, so the grid shows where the value will sit.
+	place := map[string]lipgloss.Position{"": lipgloss.Left, "center": lipgloss.Center, "right": lipgloss.Right}[cell.Align]
+	if cell.Widget == "" || cell.Widget == "spacer" {
+		place = lipgloss.Center
+	}
+	st := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(edgeColor).Width(w-2).Align(place).Padding(0, 1)
 	if m.drag == nil && m.hover == cellID(r, c) {
 		st = st.BorderForeground(accent) // hover
 	}
@@ -175,15 +180,15 @@ var dashedBorder = lipgloss.Border{
 func sections(c *Cell) []string {
 	switch {
 	case isGauge(c.Widget):
-		return []string{"Color", "Bar", "Display"}
+		return []string{"Color", "Bar", "Display", "Align"}
 	case c.Widget == "model", c.Widget == "dir":
-		return []string{"Color", "Format"}
+		return []string{"Color", "Format", "Align"}
 	case c.Widget == "text":
-		return []string{"Color", "Text"}
+		return []string{"Color", "Text", "Align"}
 	case c.Widget == "spacer":
 		return []string{"Width"}
 	}
-	return []string{"Color"}
+	return []string{"Color", "Align"}
 }
 
 // curSection: the open section, or the first one if the chosen one doesn't exist for this widget.
@@ -300,6 +305,12 @@ func (m model) settingsView() string {
 			ws = append(ws, opt{fmt.Sprintf("opt:width:%d", n), fmt.Sprint(n), w == n})
 		}
 		body = append(body, field("Width", chips(ws...)+faint.Render("  spaces reserved in the column")))
+	case "Align":
+		body = append(body, field("Align", chips(
+			opt{"opt:align:", "◧ left", c.Align == ""},
+			opt{"opt:align:center", "◫ center", c.Align == "center"},
+			opt{"opt:align:right", "◨ right", c.Align == "right"}))+
+			"\n\n"+faint.Render("Where the value sits when its column is wider than it."))
 	case "Text":
 		body = append(body, field("Text", "« "+c.Text+" »   "+toggle("insp:text", "edit", m.editing)))
 	}

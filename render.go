@@ -28,6 +28,7 @@ type Cell struct {
 	Caps    string `json:"caps,omitempty"`    // gauges: caps ("" = [ ] for ASCII, none otherwise)
 	Icon    bool   `json:"icon,omitempty"`    // model: ✳ prefix like the old statusline-command.sh
 	Version bool   `json:"version,omitempty"` // model: append the version taken from model.id
+	Align   string `json:"align,omitempty"`   // position in its column: "" (left), "center", "right"
 }
 
 type Config struct {
@@ -58,6 +59,18 @@ var widgets = []struct{ ID, Label string }{
 }
 
 func isGauge(w string) bool { return w == "context" || w == "limit5h" || w == "limit7d" }
+
+// alignIn pads v to width w, placing it left, center or right (like CSS justify-self).
+func alignIn(v string, w int, align string) string {
+	pad := w - ansi.StringWidth(v)
+	switch align {
+	case "right":
+		return strings.Repeat(" ", pad) + v
+	case "center":
+		return strings.Repeat(" ", pad/2) + v + strings.Repeat(" ", pad-pad/2)
+	}
+	return v + strings.Repeat(" ", pad)
+}
 
 // spacerWidth: width reserved by a Spacer widget (Width, 4 by default).
 func spacerWidth(c Cell) int {
@@ -550,7 +563,11 @@ func render(input []byte, cfg Config) string {
 			}
 			first, prev = false, v != ""
 			any = any || prev
-			b.WriteString(v + strings.Repeat(" ", w-ansi.StringWidth(v)))
+			align := ""
+			if k < len(cfg.Rows[i]) {
+				align = cfg.Rows[i][k].Align
+			}
+			b.WriteString(alignIn(v, w, align))
 		}
 		if !any {
 			continue // row without data: skip the row and its gap
