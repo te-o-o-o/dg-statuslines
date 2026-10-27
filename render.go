@@ -18,48 +18,48 @@ import (
 
 type Cell struct {
 	Widget  string `json:"widget,omitempty"`
-	Color   string `json:"color,omitempty"` // couleur fixe, ou schéma à seuils pour les jauges
+	Color   string `json:"color,omitempty"` // fixed color, or threshold scheme for gauges
 	Text    string `json:"text,omitempty"`
-	Bar     string `json:"bar,omitempty"`   // style de barre des jauges ("" = blocks)
-	Mode    string `json:"mode,omitempty"`  // jauges : "" = utilisé, "left" = restant
-	Width   int    `json:"width,omitempty"` // jauges : 0 = 10
+	Bar     string `json:"bar,omitempty"`   // gauge bar style ("" = blocks)
+	Mode    string `json:"mode,omitempty"`  // gauges: "" = used, "left" = remaining
+	Width   int    `json:"width,omitempty"` // gauges: 0 = 10
 	NoLabel bool   `json:"no_label,omitempty"`
-	Full    bool   `json:"full,omitempty"`    // répertoire : chemin complet avec ~
-	Caps    string `json:"caps,omitempty"`    // jauges : embouts ("" = [ ] pour ASCII, aucun sinon)
-	Icon    bool   `json:"icon,omitempty"`    // modèle : préfixe ✳ comme l'ancien statusline-command.sh
-	Version bool   `json:"version,omitempty"` // modèle : ajoute la version tirée de model.id
+	Full    bool   `json:"full,omitempty"`    // directory: full path with ~
+	Caps    string `json:"caps,omitempty"`    // gauges: caps ("" = [ ] for ASCII, none otherwise)
+	Icon    bool   `json:"icon,omitempty"`    // model: ✳ prefix like the old statusline-command.sh
+	Version bool   `json:"version,omitempty"` // model: append the version taken from model.id
 }
 
 type Config struct {
 	Rows        [][]Cell `json:"rows"`
-	Gaps        []bool   `json:"gaps,omitempty"`         // Gaps[i] : ligne vide après la ligne i
-	AirCols     bool     `json:"air_cols,omitempty"`     // plus d'espace entre les cellules
-	Sep         string   `json:"sep,omitempty"`          // séparateur entre cellules ("" = │, "space" = aucun)
-	Border      string   `json:"border,omitempty"`       // contour de toute la status line ("" = aucun)
-	BorderColor string   `json:"border_color,omitempty"` // "" = gris atténué
-	Theme       string   `json:"theme,omitempty"`        // dernier thème appliqué, sert aussi aux widgets ajoutés ensuite
+	Gaps        []bool   `json:"gaps,omitempty"`         // Gaps[i]: blank line after row i
+	AirCols     bool     `json:"air_cols,omitempty"`     // more space between cells
+	Sep         string   `json:"sep,omitempty"`          // separator between cells ("" = │, "space" = none)
+	Border      string   `json:"border,omitempty"`       // border around the whole status line ("" = none)
+	BorderColor string   `json:"border_color,omitempty"` // "" = dim gray
+	Theme       string   `json:"theme,omitempty"`        // last applied theme, also used for widgets added later
 }
 
-// Widget id -> libellé affiché dans le builder (ordre de la palette).
+// Widget id -> label shown in the builder (palette order).
 var widgets = []struct{ ID, Label string }{
-	{"model", "Modèle"},
-	{"dir", "Répertoire"},
-	{"git", "Branche git"},
+	{"model", "Model"},
+	{"dir", "Directory"},
+	{"git", "Git branch"},
 	{"userhost", "user@host"},
-	{"cost", "Coût"},
-	{"lines", "Lignes +/−"},
-	{"context", "Contexte"},
-	{"limit5h", "Limite 5h"},
-	{"limit7d", "Limite 7j"},
+	{"cost", "Cost"},
+	{"lines", "Lines +/−"},
+	{"context", "Context"},
+	{"limit5h", "Limit 5h"},
+	{"limit7d", "Limit 7d"},
 	{"reset5h", "Reset 5h"},
-	{"reset7d", "Reset 7j"},
-	{"text", "Texte"},
-	{"spacer", "Vide"},
+	{"reset7d", "Reset 7d"},
+	{"text", "Text"},
+	{"spacer", "Spacer"},
 }
 
 func isGauge(w string) bool { return w == "context" || w == "limit5h" || w == "limit7d" }
 
-// spacerWidth : largeur réservée par un widget « Vide » (Width, 4 par défaut).
+// spacerWidth: width reserved by a Spacer widget (Width, 4 by default).
 func spacerWidth(c Cell) int {
 	if c.Width == 0 {
 		return 4
@@ -67,8 +67,8 @@ func spacerWidth(c Cell) int {
 	return c.Width
 }
 
-// Couleurs proposées : nom -> index de la palette 256 couleurs.
-// 15 couleurs ANSI (normales puis vives) et 9 nuances de la palette 256.
+// Available colors: name -> index in the 256-color palette.
+// 15 ANSI colors (normal then bright) and 9 shades from the 256 palette.
 var colors = []struct {
 	Name  string
 	Index int
@@ -81,8 +81,8 @@ var colors = []struct {
 	{"purple", 141}, {"pink", 212}, {"salmon", 210}, {"brown", 130},
 }
 
-// Schémas à seuils des jauges : couleur sous 50 %, sous 80 %, au-delà (sur l'utilisé).
-// Chaque thème y ajoute aussi son propre schéma, sous son id.
+// Gauge threshold schemes: color below 50 %, below 80 %, above (on usage).
+// Each theme also adds its own scheme, under its id.
 var schemes = map[string][3]string{
 	"traffic": {"2", "3", "1"},
 	"cyans":   {"123", "51", "30"},
@@ -92,8 +92,8 @@ var schemes = map[string][3]string{
 
 var schemeOrder = []string{"traffic", "cyans", "fire", "violets"}
 
-// Thèmes : une couleur par widget, les seuils des jauges et la couleur du contour.
-// Couleurs en index 256 ou en #rrggbb (palettes officielles des thèmes).
+// Themes: one color per widget, gauge thresholds and border color.
+// Colors as 256 index or #rrggbb (official theme palettes).
 type theme struct {
 	ID, Label                                        string
 	Model, Dir, Git, User, Cost, Reset, Text, Border string
@@ -101,13 +101,21 @@ type theme struct {
 }
 
 var themes = []theme{
-	{"classic", "Classique", "51", "12", "178", "2", "178", "123", "", "30", [3]string{"123", "51", "30"}},
+	{"classic", "Classic", "51", "12", "178", "2", "178", "123", "", "30", [3]string{"123", "51", "30"}},
 	{"catppuccin", "Catppuccin", "#cba6f7", "#89b4fa", "#a6e3a1", "#fab387", "#f9e2af", "#89dceb", "#b4befe", "#6c7086", [3]string{"#a6e3a1", "#f9e2af", "#f38ba8"}},
 	{"nord", "Nord", "#88c0d0", "#81a1c1", "#a3be8c", "#b48ead", "#ebcb8b", "#8fbcbb", "#d8dee9", "#4c566a", [3]string{"#a3be8c", "#ebcb8b", "#bf616a"}},
 	{"dracula", "Dracula", "#bd93f9", "#8be9fd", "#50fa7b", "#ff79c6", "#f1fa8c", "#ffb86c", "#f8f8f2", "#6272a4", [3]string{"#50fa7b", "#ffb86c", "#ff5555"}},
 	{"tokyonight", "Tokyo Night", "#bb9af7", "#7aa2f7", "#9ece6a", "#7dcfff", "#e0af68", "#73daca", "#c0caf5", "#565f89", [3]string{"#9ece6a", "#e0af68", "#f7768e"}},
 	{"gruvbox", "Gruvbox", "#d3869b", "#83a598", "#b8bb26", "#8ec07c", "#fabd2f", "#fe8019", "#ebdbb2", "#928374", [3]string{"#b8bb26", "#fabd2f", "#fb4934"}},
 	{"rosepine", "Rosé Pine", "#c4a7e7", "#9ccfd8", "#31748f", "#ebbcba", "#f6c177", "#ebbcba", "#e0def4", "#6e6a86", [3]string{"#9ccfd8", "#f6c177", "#eb6f92"}},
+	{"solarized", "Solarized", "#6c71c4", "#268bd2", "#859900", "#2aa198", "#b58900", "#cb4b16", "#93a1a1", "#586e75", [3]string{"#859900", "#b58900", "#dc322f"}},
+	{"onedark", "One Dark", "#c678dd", "#61afef", "#98c379", "#56b6c2", "#e5c07b", "#d19a66", "#abb2bf", "#5c6370", [3]string{"#98c379", "#e5c07b", "#e06c75"}},
+	{"monokai", "Monokai", "#ae81ff", "#66d9ef", "#a6e22e", "#fd971f", "#e6db74", "#fd971f", "#f8f8f2", "#75715e", [3]string{"#a6e22e", "#e6db74", "#f92672"}},
+	{"everforest", "Everforest", "#d699b6", "#7fbbb3", "#a7c080", "#83c092", "#dbbc7f", "#e69875", "#d3c6aa", "#859289", [3]string{"#a7c080", "#dbbc7f", "#e67e80"}},
+	{"kanagawa", "Kanagawa", "#957fb8", "#7e9cd8", "#98bb6c", "#7aa89f", "#e6c384", "#ffa066", "#dcd7ba", "#727169", [3]string{"#98bb6c", "#e6c384", "#e46876"}},
+	{"ayu", "Ayu", "#d2a6ff", "#59c2ff", "#aad94c", "#95e6cb", "#e6b450", "#ff8f40", "#bfbdb6", "#636a72", [3]string{"#aad94c", "#e6b450", "#f07178"}},
+	{"githubdark", "GitHub Dark", "#bc8cff", "#58a6ff", "#3fb950", "#39c5cf", "#d29922", "#db6d28", "#c9d1d9", "#8b949e", [3]string{"#3fb950", "#d29922", "#f85149"}},
+	{"mono", "Mono", "#e4e4e4", "#bcbcbc", "#9e9e9e", "#c6c6c6", "#dadada", "#a8a8a8", "#d0d0d0", "#585858", [3]string{"#9e9e9e", "#d0d0d0", "#ff5f5f"}},
 }
 
 func init() {
@@ -116,7 +124,7 @@ func init() {
 	}
 }
 
-// color renvoie la couleur d'un widget dans le thème ("" = couleur par défaut du widget).
+// color returns a widget's color in the theme ("" = widget default color).
 func (t theme) color(widget string) string {
 	switch widget {
 	case "model":
@@ -135,13 +143,13 @@ func (t theme) color(widget string) string {
 		return t.Text
 	}
 	if isGauge(widget) {
-		return t.ID // schéma à seuils du thème
+		return t.ID // theme threshold scheme
 	}
 	return ""
 }
 
-// Séparateurs proposés ; "space" = seulement des espaces.
-// Contours de la status line : coins haut-gauche, haut-droit, bas-gauche, bas-droit, horizontal, vertical.
+// Available separators; "space" = spaces only.
+// Status line borders: top-left, top-right, bottom-left, bottom-right corners, horizontal, vertical.
 var borders = []struct{ ID, TL, TR, BL, BR, H, V string }{
 	{"rounded", "╭", "╮", "╰", "╯", "─", "│"},
 	{"square", "┌", "┐", "└", "┘", "─", "│"},
@@ -152,12 +160,12 @@ var borders = []struct{ ID, TL, TR, BL, BR, H, V string }{
 
 var separators = []string{"│", "|", "┃", "·", "•", "/", "›", "»", "◆", "⋮", "space"}
 
-// Embouts des barres : id -> gauche, droite ("none" = aucun).
+// Bar caps: id -> left, right ("none" = no caps).
 var capStyles = []struct{ ID, Left, Right string }{
 	{"none", "", ""}, {"brackets", "[", "]"}, {"thin", "▕", "▏"}, {"parens", "(", ")"}, {"angles", "⟨", "⟩"},
 }
 
-// capsOf résout le défaut : ASCII garde ses crochets historiques.
+// capsOf resolves the default: ASCII keeps its historical brackets.
 func capsOf(c Cell) string {
 	if c.Caps == "" {
 		if c.Bar == "ascii" {
@@ -169,10 +177,10 @@ func capsOf(c Cell) string {
 }
 
 var barStyles = []struct{ ID, Label string }{
-	{"blocks", "Blocs"}, {"fine", "Fin"}, {"line", "Ligne"}, {"dots", "Points"},
-	{"braille", "Braille"}, {"ascii", "ASCII"}, {"text", "Texte"},
-	{"squares", "Carrés"}, {"diamonds", "Losanges"}, {"segments", "Segments"}, {"dashes", "Tirets"},
-	{"shade", "Ombre"}, {"slider", "Curseur"}, {"ramp", "Rampe"},
+	{"blocks", "Blocks"}, {"fine", "Fine"}, {"line", "Line"}, {"dots", "Dots"},
+	{"braille", "Braille"}, {"ascii", "ASCII"}, {"text", "Text"},
+	{"squares", "Squares"}, {"diamonds", "Diamonds"}, {"segments", "Segments"}, {"dashes", "Dashes"},
+	{"shade", "Shade"}, {"slider", "Slider"}, {"ramp", "Ramp"},
 }
 
 func configPath() string {
@@ -194,7 +202,7 @@ type rateWindow struct {
 	ResetsAt       *float64 `json:"resets_at"`
 }
 
-// Sous-ensemble du JSON de session Claude Code utilisé par les widgets.
+// Subset of the Claude Code session JSON used by the widgets.
 type session struct {
 	Cwd   string `json:"cwd"`
 	Model struct {
@@ -238,7 +246,7 @@ func gitBranch(dir string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// paint colore s avec une couleur résolue par colorSpec ("" = pas de couleur).
+// paint colors s with a color resolved by colorSpec ("" = no color).
 func paint(s, spec string) string {
 	if s == "" || spec == "" {
 		return s
@@ -258,8 +266,8 @@ func dim(s string) string {
 	return "\x1b[2m" + s + "\x1b[0m"
 }
 
-// colorSpec résout une couleur de config : nom de la palette, index 256 ("178")
-// ou "#rrggbb". Renvoie l'index ou le hex, "" si inconnue.
+// colorSpec resolves a config color: palette name, 256 index ("178")
+// or "#rrggbb". Returns the index or hex, "" if unknown.
 func colorSpec(name string) string {
 	if len(name) == 7 && name[0] == '#' {
 		return name
@@ -275,10 +283,10 @@ func colorSpec(name string) string {
 	return ""
 }
 
-// bar renvoie la partie remplie et la partie vide d'une barre de w caractères.
+// bar returns the filled and empty parts of a w-character bar.
 func bar(style string, pct float64, w int) (string, string) {
 	steps := func(n int) int { return int(math.Round(pct * float64(w*n) / 100)) }
-	// Styles à sous-caractères : le dernier caractère rempli est partiel.
+	// Sub-character styles: the last filled character is partial.
 	partial := func(levels []rune, emptyCh string) (string, string) {
 		n := len(levels) - 1
 		t := steps(n)
@@ -300,10 +308,10 @@ func bar(style string, pct float64, w int) (string, string) {
 	}
 	f := steps(1)
 	switch style {
-	case "slider": // rail rempli jusqu'au curseur ●, qui occupe une cellule
+	case "slider": // rail filled up to the ● knob, which takes one cell
 		f = min(f, w-1)
 		return strings.Repeat("━", f) + "●", strings.Repeat("─", w-f-1)
-	case "ramp": // hauteur croissante selon la position dans la barre
+	case "ramp": // height grows with position in the bar
 		levels := []rune("▁▂▃▄▅▆▇█")
 		var s strings.Builder
 		for i := range f {
@@ -363,26 +371,26 @@ func gauge(c Cell, used *float64, label string) string {
 	return strings.Join(parts, " ")
 }
 
-// modelVersion extrait la version d'un id de modèle :
+// modelVersion extracts the version from a model id:
 // "claude-opus-5-5" -> "5.5", "claude-3-5-sonnet-20241022" -> "3.5", "claude-opus-4-1[1m]" -> "4.1".
 func modelVersion(id string) string {
 	id, _, _ = strings.Cut(id, "[")
 	var nums []string
 	for _, p := range strings.Split(id, "-") {
 		if len(p) > 0 && len(p) <= 2 && strings.Trim(p, "0123456789") == "" {
-			nums = append(nums, p) // les dates (8 chiffres) sont ignorées
+			nums = append(nums, p) // dates (8 digits) are ignored
 		}
 	}
 	return strings.Join(nums, ".")
 }
 
-var weekdays = [...]string{"dim", "lun", "mar", "mer", "jeu", "ven", "sam"}
+var weekdays = [...]string{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"}
 
 func humanize(d time.Duration) string {
 	s := max(int(d.Seconds()), 0)
 	switch {
 	case s >= 86400:
-		return fmt.Sprintf("%dj%02dh", s/86400, s%86400/3600)
+		return fmt.Sprintf("%dd%02dh", s/86400, s%86400/3600)
 	case s >= 3600:
 		return fmt.Sprintf("%dh%02dm", s/3600, s%3600/60)
 	case s >= 60:
@@ -408,12 +416,12 @@ func usedOf(w *rateWindow) *float64 {
 		return nil
 	}
 	if w.UsedPercentage == nil {
-		return new(float64) // fenêtre présente sans pourcentage : 0 %
+		return new(float64) // window present without a percentage: 0 %
 	}
 	return w.UsedPercentage
 }
 
-// cellValue renvoie le texte coloré d'une cellule, "" si la donnée est absente.
+// cellValue returns a cell's colored text, "" if the data is missing.
 func cellValue(c Cell, s session) string {
 	col := colorSpec(c.Color)
 	switch c.Widget {
@@ -422,7 +430,7 @@ func cellValue(c Cell, s session) string {
 		if name == "" {
 			return ""
 		}
-		// N'ajoute la version que si le nom affiché n'en contient pas déjà une.
+		// Only append the version if the display name doesn't already contain one.
 		if v := modelVersion(s.Model.ID); c.Version && v != "" && !strings.ContainsAny(name, "0123456789") {
 			name += " " + v
 		}
@@ -460,7 +468,7 @@ func cellValue(c Cell, s session) string {
 		if s.Cost.TotalLinesAdded == nil || s.Cost.TotalLinesRemoved == nil {
 			return ""
 		}
-		add, del := "2", "1" // vert / rouge sauf couleur choisie
+		add, del := "2", "1" // green / red unless a color is chosen
 		if col != "" {
 			add, del = col, col
 		}
@@ -471,20 +479,20 @@ func cellValue(c Cell, s session) string {
 	case "limit5h":
 		return gauge(c, usedOf(s.RateLimits.FiveHour), "5h")
 	case "limit7d":
-		return gauge(c, usedOf(s.RateLimits.SevenDay), "7j")
+		return gauge(c, usedOf(s.RateLimits.SevenDay), "7d")
 	case "reset5h":
 		return reset(c, s.RateLimits.FiveHour, "5h ↻", false)
 	case "reset7d":
-		return reset(c, s.RateLimits.SevenDay, "7j ↻", true)
+		return reset(c, s.RateLimits.SevenDay, "7d ↻", true)
 	case "text":
 		return paint(c.Text, col)
 	}
 	return ""
 }
 
-// render produit la status line. JSON invalide => champs vides, jamais d'erreur.
-// Les couleurs sont des codes ANSI bruts : stdout n'est pas un TTY quand Claude
-// Code capture la sortie, lipgloss les supprimerait.
+// render builds the status line. Invalid JSON => empty fields, never an error.
+// Colors are raw ANSI codes: stdout is not a TTY when Claude Code
+// captures the output, so lipgloss would strip them.
 func render(input []byte, cfg Config) string {
 	var s session
 	_ = json.Unmarshal(input, &s)
@@ -501,10 +509,10 @@ func render(input []byte, cfg Config) string {
 	sep := pad + ch + pad
 	sepW := ansi.StringWidth(sep)
 
-	// Grille façon CSS : chaque colonne prend la largeur de sa cellule la plus large.
-	// Une cellule vide (ou un widget sans donnée) laisse un blanc de la largeur de sa
-	// colonne, sans séparateur ; une colonne vide sur toutes les lignes disparaît,
-	// sauf si un widget « Vide » lui impose une largeur.
+	// CSS-like grid: each column takes the width of its widest cell.
+	// An empty cell (or a widget without data) leaves a blank as wide as its
+	// column, with no separator; a column empty on every row disappears,
+	// unless a Spacer widget forces a width on it.
 	vals := make([][]string, len(cfg.Rows))
 	var widths []int
 	for i, row := range cfg.Rows {
@@ -545,19 +553,19 @@ func render(input []byte, cfg Config) string {
 			b.WriteString(v + strings.Repeat(" ", w-ansi.StringWidth(v)))
 		}
 		if !any {
-			continue // ligne sans donnée : ni la ligne ni son espace
+			continue // row without data: skip the row and its gap
 		}
 		lines = append(lines, strings.TrimRight(b.String(), " "))
 		if i < len(cfg.Gaps) && cfg.Gaps[i] {
-			// Espace de largeur nulle plutôt qu'une ligne vide, comme dans l'ancien statusline-command.sh.
+			// Zero-width space rather than an empty line, as in the old statusline-command.sh.
 			lines = append(lines, "\u200b")
 		}
 	}
 	return strings.Join(frame(lines, cfg), "\n")
 }
 
-// frame entoure les lignes d'un contour à la largeur de la plus longue.
-// Les lignes vides (espace de largeur nulle) deviennent des lignes vides du cadre.
+// frame wraps the lines in a border as wide as the longest one.
+// Blank lines (zero-width space) become empty lines inside the frame.
 func frame(lines []string, cfg Config) []string {
 	for _, b := range borders {
 		if b.ID != cfg.Border || len(lines) == 0 {

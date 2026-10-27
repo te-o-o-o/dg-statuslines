@@ -1,7 +1,7 @@
 package main
 
-// Onglet Disposition : grille en cartes, widgets en pastilles, puis les réglages de la
-// cellule (ou de la ligne) sélectionnée, rangés en sections. Tous les choix sont visibles.
+// Layout tab: grid of cards, widgets as chips, then the settings of the selected
+// cell (or row), grouped in sections. Every choice is visible.
 
 import (
 	"fmt"
@@ -19,12 +19,12 @@ var widgetGroups = []struct {
 	IDs  []string
 }{
 	{"Session", []string{"model", "dir", "git", "userhost"}},
-	{"Jauges", []string{"context", "limit5h", "limit7d"}},
-	{"Activité", []string{"cost", "lines", "reset5h", "reset7d", "text"}},
-	{"Mise en page", []string{"spacer"}},
+	{"Gauges", []string{"context", "limit5h", "limit7d"}},
+	{"Activity", []string{"cost", "lines", "reset5h", "reset7d", "text"}},
+	{"Layout", []string{"spacer"}},
 }
 
-// optIDs : tous les choix cliquables des sections (zones fixes).
+// optIDs: all clickable choices in the sections (fixed zones).
 func optIDs() []string {
 	ids := []string{"opt:mode:", "opt:mode:left", "opt:width:1", "opt:width:2", "opt:width:4",
 		"opt:width:5", "opt:width:8", "opt:width:10", "opt:width:15", "opt:width:16",
@@ -52,10 +52,10 @@ func (m model) selCell() *Cell {
 	return &m.cfg.Rows[m.sel.r][m.sel.c]
 }
 
-// gapChipW : place du bouton « ligne vide » au bout de chaque ligne de la grille.
+// gapChipW: room for the "blank line" button at the end of each grid row.
 const gapChipW = 16
 
-// cardW : largeur d'une carte, réduite pour que la grille et ses boutons tiennent dans le terminal.
+// cardW: card width, shrunk so the grid and its buttons fit in the terminal.
 func (m model) cardW() int {
 	n := len(m.cfg.Rows[0])
 	return min(17, max(10, (m.width()-2-4-(n-1)-gapChipW)/n))
@@ -63,11 +63,11 @@ func (m model) cardW() int {
 
 func (m model) layoutTab() string {
 	btns := lipgloss.JoinHorizontal(lipgloss.Top,
-		toggle("btn:+row", "+ ligne", false), " ",
-		toggle("btn:-row", "− ligne", false), "   ",
-		toggle("btn:+col", "+ colonne", false), " ",
-		toggle("btn:-col", "− colonne", false))
-	parts := []string{m.titled(heading.Render("GRILLE")), "", m.cardsView(), "", "    " + btns, "", "", m.widgetsView()}
+		toggle("btn:+row", "+ row", false), " ",
+		toggle("btn:-row", "− row", false), "   ",
+		toggle("btn:+col", "+ column", false), " ",
+		toggle("btn:-col", "− column", false))
+	parts := []string{m.titled(heading.Render("GRID")), "", m.cardsView(), "", "    " + btns, "", "", m.widgetsView()}
 	if s := m.settingsView(); s != "" {
 		parts = append(parts, "", "", s)
 	}
@@ -89,11 +89,11 @@ func (m model) cardsView() string {
 			}
 			cards = append(cards, m.card(r, c))
 		}
-		cards = append(cards, "  ", toggle(fmt.Sprintf("gap:%d", r), "↵ ligne vide", m.gap(r)))
+		cards = append(cards, "  ", toggle(fmt.Sprintf("gap:%d", r), "↵ blank line", m.gap(r)))
 		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Center, cards...))
 		if m.gap(r) {
 			w := len(row)*(m.cardW()+1) - 1
-			rows = append(rows, "    "+faint.Render(lipgloss.PlaceHorizontal(w, lipgloss.Center, " ligne vide ", lipgloss.WithWhitespaceChars("┄"))))
+			rows = append(rows, "    "+faint.Render(lipgloss.PlaceHorizontal(w, lipgloss.Center, " blank line ", lipgloss.WithWhitespaceChars("┄"))))
 		}
 	}
 	return strings.Join(rows, "\n")
@@ -113,12 +113,12 @@ func (m model) card(r, c int) string {
 		}
 		text = colorOf(cell.Color).Render(ansi.Truncate(t, w-2, "…"))
 		if cell.Widget == "spacer" {
-			text = faint.Render(ansi.Truncate(fmt.Sprintf("␣ vide %d", spacerWidth(cell)), w-2, "…"))
+			text = faint.Render(ansi.Truncate(fmt.Sprintf("␣ spacer %d", spacerWidth(cell)), w-2, "…"))
 		}
 	}
 	st := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(edgeColor).Width(w - 2).Align(lipgloss.Center)
 	if m.drag == nil && m.hover == cellID(r, c) {
-		st = st.BorderForeground(accent) // survol
+		st = st.BorderForeground(accent) // hover
 	}
 	switch id := cellID(r, c); {
 	case m.drag != nil && m.hover == id:
@@ -135,9 +135,9 @@ func (m model) card(r, c int) string {
 func (m model) widgetsView() string {
 	head := heading.Render("WIDGETS")
 	if m.drag != nil && m.drag.from != nil && (m.hover == "palette" || strings.HasPrefix(m.hover, "pal:")) {
-		head = errStyle.Bold(true).Render("RELÂCHER POUR RETIRER LE WIDGET")
+		head = errStyle.Bold(true).Render("RELEASE TO REMOVE THE WIDGET")
 	}
-	head = m.titled(head) + "\n" + faint.Render("Glisse un widget vers la grille, ou ramène une cellule ici pour la retirer.")
+	head = m.titled(head) + "\n" + faint.Render("Drag a widget onto the grid, or drag a cell back here to remove it.")
 	var groups []string
 	for _, g := range widgetGroups {
 		var chips []string
@@ -147,39 +147,39 @@ func (m model) widgetsView() string {
 			}
 			edge := edgeColor
 			if m.drag == nil && m.hover == "pal:"+id || m.drag != nil && m.drag.from == nil && m.drag.cell.Widget == id {
-				edge = accent // survolé, ou en cours de glisser
+				edge = accent // hovered, or being dragged
 			}
 			chips = append(chips, zone.Mark("pal:"+id, lipgloss.NewStyle().Border(dashedBorder).BorderForeground(edge).Padding(0, 1).Render(label(id))))
 		}
-		// Intitulé du groupe sur la ligne du milieu des boutons.
+		// Group name on the middle line of the buttons.
 		groups = append(groups, lipgloss.JoinHorizontal(lipgloss.Center, faint.Width(labelW).Render(g.Name), lipgloss.JoinHorizontal(lipgloss.Top, chips...)))
 	}
-	// Groupes collés : les contours des boutons suffisent à séparer les rangées.
+	// No gap between groups: button borders already separate the rows.
 	return zone.Mark("palette", head+"\n\n"+strings.Join(groups, "\n"))
 }
 
-// dashedBorder : contour en tirets des boutons de la liste des widgets (« à faire glisser »).
+// dashedBorder: dashed border for the widget list buttons ("draggable").
 var dashedBorder = lipgloss.Border{
 	Top: "╌", Bottom: "╌", Left: "╎", Right: "╎",
 	TopLeft: "╭", TopRight: "╮", BottomLeft: "╰", BottomRight: "╯",
 }
 
-// sections : les sections de réglages selon le widget de la cellule.
+// sections: the settings sections for the cell's widget.
 func sections(c *Cell) []string {
 	switch {
 	case isGauge(c.Widget):
-		return []string{"Couleur", "Barre", "Affichage"}
+		return []string{"Color", "Bar", "Display"}
 	case c.Widget == "model", c.Widget == "dir":
-		return []string{"Couleur", "Format"}
+		return []string{"Color", "Format"}
 	case c.Widget == "text":
-		return []string{"Couleur", "Texte"}
+		return []string{"Color", "Text"}
 	case c.Widget == "spacer":
-		return []string{"Largeur"}
+		return []string{"Width"}
 	}
-	return []string{"Couleur"}
+	return []string{"Color"}
 }
 
-// curSection : la section ouverte, la première si celle choisie n'existe pas pour ce widget.
+// curSection: the open section, or the first one if the chosen one doesn't exist for this widget.
 func (m model) curSection() string {
 	c := m.selCell()
 	if c == nil || c.Widget == "" {
@@ -210,16 +210,16 @@ func chips(opts ...opt) string {
 func (m model) settingsView() string {
 	if m.selRow != nil {
 		r := *m.selRow
-		return m.titled(heading.Render(fmt.Sprintf("LIGNE %d", r+1))) + "\n\n" +
-			field("Ligne vide", toggle(fmt.Sprintf("gap:%d", r), "après cette ligne", m.gap(r)))
+		return m.titled(heading.Render(fmt.Sprintf("ROW %d", r+1))) + "\n\n" +
+			field("Blank line", toggle(fmt.Sprintf("gap:%d", r), "after this row", m.gap(r)))
 	}
 	c := m.selCell()
 	if c == nil {
 		return ""
 	}
-	where := faint.Render(fmt.Sprintf("  ligne %d · colonne %d", m.sel.r+1, m.sel.c+1))
+	where := faint.Render(fmt.Sprintf("  row %d · column %d", m.sel.r+1, m.sel.c+1))
 	if c.Widget == "" {
-		return m.titled(heading.Render("CELLULE VIDE")+where) + "\n\n" + faint.Render("Glisse un widget depuis la liste au-dessus.")
+		return m.titled(heading.Render("EMPTY CELL")+where) + "\n\n" + faint.Render("Drag a widget from the list above.")
 	}
 
 	cur := m.curSection()
@@ -234,8 +234,8 @@ func (m model) settingsView() string {
 
 	var body []string
 	switch cur {
-	case "Couleur":
-		// Le nom de la section suffit : les carrés s'alignent à gauche, sans intitulé.
+	case "Color":
+		// The section name is enough: swatches align left, without a label.
 		body = append(body, swatchGrid("color:", c.Color, "", colorItems("auto"), 8))
 		if isGauge(c.Widget) {
 			var sw []swatch
@@ -243,9 +243,9 @@ func (m model) settingsView() string {
 				sc := schemes[name]
 				sw = append(sw, swatch{ID: name, Colors: sc[:]})
 			}
-			body = append(body, faint.Render("Seuils")+"\n\n"+swatchGrid("color:", c.Color, "", sw, 4))
+			body = append(body, faint.Render("Thresholds")+"\n\n"+swatchGrid("color:", c.Color, "", sw, 4))
 		}
-	case "Barre":
+	case "Bar":
 		var rows, row []string
 		for i, b := range barStyles {
 			fill, empty := bar(b.ID, 42, 4)
@@ -259,8 +259,8 @@ func (m model) settingsView() string {
 				row = nil
 			}
 		}
-		body = append(body, field("Barre", strings.Join(rows, "\n\n")))
-	case "Affichage":
+		body = append(body, field("Bar", strings.Join(rows, "\n\n")))
+	case "Display":
 		w := c.Width
 		if w == 0 {
 			w = 10
@@ -269,41 +269,41 @@ func (m model) settingsView() string {
 		for _, cp := range capStyles {
 			name := cp.Left + " " + cp.Right
 			if cp.ID == "none" {
-				name = "aucun"
+				name = "none"
 			}
 			caps = append(caps, opt{"opt:caps:" + cp.ID, name, capsOf(*c) == cp.ID})
 		}
 		body = append(body,
-			field("Afficher", chips(opt{"opt:mode:", "utilisé", c.Mode == ""}, opt{"opt:mode:left", "restant", c.Mode == "left"})),
-			field("Largeur", chips(opt{"opt:width:5", "5", w == 5}, opt{"opt:width:10", "10", w == 10}, opt{"opt:width:15", "15", w == 15})),
-			field("Embouts", chips(caps...)),
-			field("Étiquette", chips(opt{"opt:label:on", "oui", !c.NoLabel}, opt{"opt:label:off", "non", c.NoLabel})))
+			field("Show", chips(opt{"opt:mode:", "used", c.Mode == ""}, opt{"opt:mode:left", "left", c.Mode == "left"})),
+			field("Width", chips(opt{"opt:width:5", "5", w == 5}, opt{"opt:width:10", "10", w == 10}, opt{"opt:width:15", "15", w == 15})),
+			field("Caps", chips(caps...)),
+			field("Label", chips(opt{"opt:label:on", "yes", !c.NoLabel}, opt{"opt:label:off", "no", c.NoLabel})))
 	case "Format":
 		if c.Widget == "model" {
 			body = append(body,
 				field("Format", chips(opt{"opt:icon:no", "Opus", !c.Icon}, opt{"opt:icon:yes", "✳ Opus", c.Icon})),
-				field("Version", chips(opt{"opt:version:no", "non", !c.Version}, opt{"opt:version:yes", "oui", c.Version})))
+				field("Version", chips(opt{"opt:version:no", "no", !c.Version}, opt{"opt:version:yes", "yes", c.Version})))
 		} else {
-			body = append(body, field("Format", chips(opt{"opt:full:no", "nom du dossier", !c.Full}, opt{"opt:full:yes", "chemin ~", c.Full})))
+			body = append(body, field("Format", chips(opt{"opt:full:no", "folder name", !c.Full}, opt{"opt:full:yes", "~ path", c.Full})))
 		}
-	case "Largeur":
+	case "Width":
 		w := spacerWidth(*c)
 		var ws []opt
 		for _, n := range []int{1, 2, 4, 8, 16} {
 			ws = append(ws, opt{fmt.Sprintf("opt:width:%d", n), fmt.Sprint(n), w == n})
 		}
-		body = append(body, field("Largeur", chips(ws...)+faint.Render("  espaces réservés dans la colonne")))
-	case "Texte":
-		body = append(body, field("Texte", "« "+c.Text+" »   "+toggle("insp:text", "modifier", m.editing)))
+		body = append(body, field("Width", chips(ws...)+faint.Render("  spaces reserved in the column")))
+	case "Text":
+		body = append(body, field("Text", "« "+c.Text+" »   "+toggle("insp:text", "edit", m.editing)))
 	}
 
 	return m.titled(heading.Render(strings.ToUpper(label(c.Widget)))+where) + "\n\n" +
 		strings.Join(tabs, "    ") + "\n\n" + strings.Join(body, "\n\n")
 }
 
-// titled prolonge un titre de bloc par un filet gris jusqu'au bord droit.
+// titled extends a block title with a gray rule up to the right edge.
 func (m model) titled(title string) string {
-	rule := m.width() - 6 - ansi.StringWidth(title) // retrait de 2, marge droite de 2, espaces
+	rule := m.width() - 6 - ansi.StringWidth(title) // indent of 2, right margin of 2, spaces
 	if rule < 2 {
 		return title
 	}
