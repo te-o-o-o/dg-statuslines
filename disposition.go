@@ -67,17 +67,23 @@ func (m model) layoutTab() string {
 		toggle("btn:-row", "− row", false), "   ",
 		toggle("btn:+col", "+ column", false), " ",
 		toggle("btn:-col", "− column", false))
+	// Random comes first, in gold: the quickest way to a starting point.
+	random := lipgloss.NewStyle().Padding(0, 1).Bold(true).Background(lipgloss.Color("220")).Foreground(lipgloss.Color("0"))
+	if m.drag == nil && m.hover == "preset:random" {
+		random = random.Background(lipgloss.Color("228"))
+	}
+	roll := []string{zone.Mark("preset:random", random.Render("⚄ Random"))}
+	if m.rollIdx > 0 {
+		roll = append(roll, toggle("preset:prev", "↶ Previous", false))
+	}
+	roll = append(roll, faint.Render(" r to reroll"))
 	var ps []string
 	for _, p := range presets {
 		ps = append(ps, toggle("preset:"+p.ID, p.Label, false))
 	}
-	ps = append(ps, " ", toggle("preset:random", "⚄ Random", false))
-	if m.rollIdx > 0 {
-		ps = append(ps, toggle("preset:prev", "↶ Previous", false))
-	}
 	parts := []string{
 		m.titled(heading.Render("PRESETS")), faint.Render("Start from a ready-made layout. It replaces the current grid and style."), "",
-		strings.Join(ps, " "), "", "",
+		strings.Join(roll, " "), "", strings.Join(ps, " "), "", "",
 		m.titled(heading.Render("GRID")), "", m.cardsView(), "", "    " + btns, "", "", m.widgetsView()}
 	if s := m.settingsView(); s != "" {
 		parts = append(parts, "", "", s)
