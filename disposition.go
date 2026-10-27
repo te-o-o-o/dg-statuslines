@@ -314,16 +314,19 @@ func (m model) settingsView() string {
 	var body []string
 	switch cur {
 	case "Color":
-		// The section name is enough: swatches align left, without a label.
-		body = append(body, swatchGrid("color:", c.Color, colorItems("auto"), 8))
+		// Gauges: thresholds first, then single colours. Other widgets: colours only,
+		// aligned left without a label (the section name is enough).
+		colours := swatchGrid("color:", c.Color, colorItems("auto"), 8)
 		if isGauge(c.Widget) {
 			var sw []swatch
 			for _, name := range schemeOrder {
 				sc := schemes[name]
 				sw = append(sw, swatch{ID: name, Colors: sc[:]})
 			}
-			body = append(body, faint.Render("Thresholds")+"\n\n"+swatchGrid("color:", c.Color, sw, 4))
+			body = append(body, faint.Render("Thresholds")+"\n\n"+swatchGrid("color:", c.Color, sw, 5))
+			colours = faint.Render("Single color") + "\n\n" + colours
 		}
+		body = append(body, colours)
 	case "Bar":
 		var rows, row []string
 		for i, b := range barStyles {
