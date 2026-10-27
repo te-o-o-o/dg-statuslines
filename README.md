@@ -12,6 +12,7 @@
   <a href="#install">Install</a> ·
   <a href="#use">Use</a> ·
   <a href="#where-it-runs">Where it runs</a> ·
+  <a href="ROADMAP.md">Roadmap</a> ·
   <a href="#license">License</a>
 </p>
 
