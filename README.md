@@ -42,16 +42,20 @@ Go 1.27 or later is all it takes:
 
 ```bash
 git clone https://github.com/te-o-o-o/dg-statuslines && cd dg-statuslines
-go build -o slb .
+go install .
 ```
 
-Then run `./slb edit`, build your line, and install it from the **Install** tab. The path
-written to Claude Code is the binary's own, so keep it where it is, or move it first.
+This puts `slb` in `$(go env GOPATH)/bin`, usually `~/go/bin`; add it to your `PATH` if it
+is not there yet. Then run `slb`, build your line, and install it from the **Install** tab.
+
+Claude Code runs the binary from the path the Install tab writes. After an update, run
+`go install .` again: the path stays the same, so nothing needs reinstalling.
 
 ## Use
 
 | Key | Action |
 |---|---|
+| `slb` | open the builder (`slb help` lists the commands) |
 | `1` `2` `3`, `Tab` | Layout, Style and Install tabs |
 | drag | place a widget, move or swap cells, drop on the widget list to remove |
 | `←↑↓→` | select a cell |
