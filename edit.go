@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"strconv"
 	"strings"
@@ -43,7 +44,10 @@ type model struct {
 	selRow  *int   // row selected via its gutter (L1, L2…)
 	section string // open settings section (Color, Bar…)
 	scroll  int    // scroll offset of the content below the preview
-	editing bool   // typing the free text of the selected cell
+	rng     *rand.Rand
+	rolls   []Config // random layouts drawn so far, to step back through them
+	rollIdx int
+	editing bool // typing the free text of the selected cell
 	drag    *drag
 	hover   string // zone hovered during the drag
 	mx, my  int
@@ -156,6 +160,7 @@ func (m model) hit(msg tea.MouseMsg) string {
 	for _, p := range presets {
 		ids = append(ids, "preset:"+p.ID)
 	}
+	ids = append(ids, "preset:random", "preset:prev")
 	for _, b := range borders {
 		ids = append(ids, "border:"+b.ID)
 	}
@@ -293,6 +298,13 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 		}
 	case hit == "btn:aircols":
 		m.cfg.AirCols = !m.cfg.AirCols
+	case hit == "preset:random":
+		m.roll()
+		return m, m.notify("Random · r reroll · R previous · s save", false)
+	case hit == "preset:prev":
+		if m.prevRoll() {
+			return m, m.notify(fmt.Sprintf("Roll %d of %d · s save", m.rollIdx+1, len(m.rolls)), false)
+		}
 	case strings.HasPrefix(hit, "preset:"):
 		for _, p := range presets {
 			if "preset:"+p.ID == hit {
@@ -480,6 +492,13 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.scrollBy(m.bodyRoom() - 2)
 	case "pgup":
 		m.scrollBy(-(m.bodyRoom() - 2))
+	case "r":
+		m.roll()
+		return m, m.notify("Random · r reroll · R previous · s save", false)
+	case "R":
+		if m.prevRoll() {
+			return m, m.notify(fmt.Sprintf("Roll %d of %d · s save", m.rollIdx+1, len(m.rolls)), false)
+		}
 	case "s":
 		return m, m.save()
 	case "i":
