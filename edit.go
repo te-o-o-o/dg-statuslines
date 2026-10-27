@@ -139,7 +139,7 @@ func parseCell(id string) (pos, bool) {
 func (m model) hit(msg tea.MouseMsg) string {
 	ids := []string{"tab:0", "tab:1", "tab:2", "btn:install", "palette"}
 	for r, row := range m.cfg.Rows {
-		ids = append(ids, fmt.Sprintf("row:%d", r), fmt.Sprintf("gap:%d", r))
+		ids = append(ids, fmt.Sprintf("row:%d", r), fmt.Sprintf("gap:%d", r), fmt.Sprintf("free:%d", r))
 		for c := range row {
 			ids = append(ids, cellID(r, c))
 		}
@@ -288,6 +288,12 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 		return m, m.install()
 	case strings.HasPrefix(hit, "pal:"):
 		m.drag = &drag{cell: Cell{Widget: strings.TrimPrefix(hit, "pal:")}}
+	case strings.HasPrefix(hit, "free:"):
+		r, _ := strconv.Atoi(strings.TrimPrefix(hit, "free:"))
+		for len(m.cfg.Free) <= r {
+			m.cfg.Free = append(m.cfg.Free, false)
+		}
+		m.cfg.Free[r] = !m.cfg.Free[r]
 	case strings.HasPrefix(hit, "gap:"):
 		r, _ := strconv.Atoi(strings.TrimPrefix(hit, "gap:"))
 		m.setGap(r, !m.gap(r))
@@ -325,6 +331,7 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	case hit == "btn:-row" && len(m.cfg.Rows) > 1:
 		m.cfg.Rows = m.cfg.Rows[:len(m.cfg.Rows)-1]
 		m.cfg.Gaps = m.cfg.Gaps[:min(len(m.cfg.Gaps), len(m.cfg.Rows))]
+		m.cfg.Free = m.cfg.Free[:min(len(m.cfg.Free), len(m.cfg.Rows))]
 	case hit == "btn:+col" && len(m.cfg.Rows[0]) < 8:
 		for i := range m.cfg.Rows {
 			m.cfg.Rows[i] = append(m.cfg.Rows[i], Cell{})
