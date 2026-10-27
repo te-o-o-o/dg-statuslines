@@ -12,6 +12,10 @@ import (
 	zone "github.com/lrstanley/bubblezone"
 )
 
+// groupStyle sets the widget group names apart, softly: blue, away from the pink
+// selection and the gold Random button.
+var groupStyle = lipgloss.NewStyle().Width(10).Foreground(lipgloss.Color("110"))
+
 var selStyle = lipgloss.NewStyle().Background(accent).Foreground(lipgloss.Color("0")).Bold(true)
 
 var widgetGroups = []struct {
@@ -198,11 +202,33 @@ func (m model) widgetsView() string {
 			}
 			chips = append(chips, zone.Mark("pal:"+id, lipgloss.NewStyle().Border(dashedBorder).BorderForeground(edge).Padding(0, 1).Render(label(id))))
 		}
-		// Group name on the middle line of the buttons.
-		groups = append(groups, lipgloss.JoinHorizontal(lipgloss.Center, faint.Width(labelW).Render(g.Name), lipgloss.JoinHorizontal(lipgloss.Top, chips...)))
+		// Group name on the middle line of the buttons, in a narrow column of its own.
+		groups = append(groups, lipgloss.JoinHorizontal(lipgloss.Center, groupStyle.Render(g.Name), lipgloss.JoinHorizontal(lipgloss.Top, chips...)))
 	}
-	// No gap between groups: button borders already separate the rows.
-	return zone.Mark("palette", head+"\n\n"+strings.Join(groups, "\n"))
+	// Pack the groups: each one goes on the first line with room left (first fit), so
+	// small groups share a line instead of taking one each.
+	room := m.width() - 4
+	var lines [][]string
+	var used []int
+	for _, g := range groups {
+		w := lipgloss.Width(g)
+		placed := false
+		for i := range lines {
+			if used[i]+3+w <= room {
+				lines[i], used[i], placed = append(lines[i], "   ", g), used[i]+3+w, true
+				break
+			}
+		}
+		if !placed {
+			lines, used = append(lines, []string{g}), append(used, w)
+		}
+	}
+	var rows []string
+	for _, l := range lines {
+		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, l...))
+	}
+	// No gap between lines: button borders already separate them.
+	return zone.Mark("palette", head+"\n\n"+strings.Join(rows, "\n"))
 }
 
 // dashedBorder: dashed border for the widget list buttons ("draggable").
