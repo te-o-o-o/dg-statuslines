@@ -93,11 +93,7 @@ func (m model) cardsView() string {
 	var rows []string
 	for r, row := range m.cfg.Rows {
 		g := fmt.Sprintf("L%d", r+1)
-		gst := faint
-		if m.selRow != nil && *m.selRow == r {
-			gst = selStyle
-		}
-		cards := []string{zone.Mark(fmt.Sprintf("row:%d", r), gst.Render(g)) + strings.Repeat(" ", 4-len(g))}
+		cards := []string{faint.Render(g) + strings.Repeat(" ", 4-len(g))}
 		for c := range row {
 			if c > 0 {
 				cards = append(cards, m.sepSlot(r, c-1))
@@ -232,6 +228,9 @@ var dashedBorder = lipgloss.Border{
 }
 
 // sections: the settings sections for the cell's widget.
+// sectionNames lists every settings section; sections() picks those a widget has.
+var sectionNames = []string{"Color", "Bar", "Display", "Format", "Text", "Width", "Align"}
+
 func sections(c *Cell) []string {
 	switch {
 	case isGauge(c.Widget):
@@ -293,11 +292,6 @@ func (m model) settingsView() string {
 		return m.titled(heading.Render("SEPARATOR")+faint.Render(fmt.Sprintf("  row %d · after column %d", p.r+1, p.c+1))) + "\n\n" +
 			chips(o...) + "\n\n" + faint.Render("inherit follows the separator chosen in the Style tab.")
 	}
-	if m.selRow != nil {
-		r := *m.selRow
-		return m.titled(heading.Render(fmt.Sprintf("ROW %d", r+1))) + "\n\n" +
-			field("Blank line", toggle(fmt.Sprintf("gap:%d", r), "after this row", m.gap(r)))
-	}
 	c := m.selCell()
 	if c == nil {
 		return ""
@@ -321,14 +315,14 @@ func (m model) settingsView() string {
 	switch cur {
 	case "Color":
 		// The section name is enough: swatches align left, without a label.
-		body = append(body, swatchGrid("color:", c.Color, "", colorItems("auto"), 8))
+		body = append(body, swatchGrid("color:", c.Color, colorItems("auto"), 8))
 		if isGauge(c.Widget) {
 			var sw []swatch
 			for _, name := range schemeOrder {
 				sc := schemes[name]
 				sw = append(sw, swatch{ID: name, Colors: sc[:]})
 			}
-			body = append(body, faint.Render("Thresholds")+"\n\n"+swatchGrid("color:", c.Color, "", sw, 4))
+			body = append(body, faint.Render("Thresholds")+"\n\n"+swatchGrid("color:", c.Color, sw, 4))
 		}
 	case "Bar":
 		var rows, row []string

@@ -5,14 +5,14 @@ package main
 import "github.com/charmbracelet/lipgloss"
 
 type uiTheme struct {
-	ID, Label                                                                        string
+	ID                                                                               string
 	Accent, OnAccent, Edge, Rule, Heading, Group, Faint, Button, Random, RandomHover string
 }
 
 var uiThemes = []uiTheme{
-	{"ocean", "Ocean", "#5fd7ff", "#0f1720", "#3a4a5c", "#26323f", "#7f93a8", "#5fafaf", "#5c6b7a", "#1f2b38", "#ff875f", "#ffaf87"},
+	{"ocean", "#5fd7ff", "#0f1720", "#3a4a5c", "#26323f", "#7f93a8", "#5fafaf", "#5c6b7a", "#1f2b38", "#ff875f", "#ffaf87"},
 	// For light terminals: dark text, a deep accent.
-	{"paper", "Paper", "#af005f", "#ffffff", "#bcbcbc", "#dadada", "#6c6c6c", "#005f87", "#8a8a8a", "#e4e4e4", "#d78700", "#ffaf00"},
+	{"paper", "#af005f", "#ffffff", "#bcbcbc", "#dadada", "#6c6c6c", "#005f87", "#8a8a8a", "#e4e4e4", "#d78700", "#ffaf00"},
 }
 
 // Set by applyUI; every view reads them.
