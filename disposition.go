@@ -275,7 +275,7 @@ func (m model) settingsView() string {
 				row = nil
 			}
 		}
-		body = append(body, field("Bar", strings.Join(rows, "\n\n")))
+		body = append(body, strings.Join(rows, "\n\n"))
 	case "Display":
 		w := c.Width
 		if w == 0 {
@@ -300,7 +300,7 @@ func (m model) settingsView() string {
 				field("Format", chips(opt{"opt:icon:no", "Opus", !c.Icon}, opt{"opt:icon:yes", "✳ Opus", c.Icon})),
 				field("Version", chips(opt{"opt:version:no", "no", !c.Version}, opt{"opt:version:yes", "yes", c.Version})))
 		} else {
-			body = append(body, field("Format", chips(opt{"opt:full:no", "folder name", !c.Full}, opt{"opt:full:yes", "~ path", c.Full})))
+			body = append(body, chips(opt{"opt:full:no", "folder name", !c.Full}, opt{"opt:full:yes", "~ path", c.Full}))
 		}
 	case "Width":
 		w := spacerWidth(*c)
@@ -308,15 +308,15 @@ func (m model) settingsView() string {
 		for _, n := range []int{1, 2, 4, 8, 16} {
 			ws = append(ws, opt{fmt.Sprintf("opt:width:%d", n), fmt.Sprint(n), w == n})
 		}
-		body = append(body, field("Width", chips(ws...)+faint.Render("  spaces reserved in the column")))
+		body = append(body, chips(ws...)+faint.Render("  spaces reserved in the column"))
 	case "Align":
-		body = append(body, field("Align", chips(
+		body = append(body, chips(
 			opt{"opt:align:", "◧ left", c.Align == ""},
 			opt{"opt:align:center", "◫ center", c.Align == "center"},
-			opt{"opt:align:right", "◨ right", c.Align == "right"}))+
+			opt{"opt:align:right", "◨ right", c.Align == "right"})+
 			"\n\n"+faint.Render("Where the value sits when its column is wider than it."))
 	case "Text":
-		body = append(body, field("Text", "« "+c.Text+" »   "+toggle("insp:text", "edit", m.editing)))
+		body = append(body, "« "+c.Text+" »   "+toggle("insp:text", "edit", m.editing))
 	}
 
 	return m.titled(heading.Render(strings.ToUpper(label(c.Widget)))+where) + "\n\n" +
