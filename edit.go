@@ -153,6 +153,9 @@ func (m model) hit(msg tea.MouseMsg) string {
 	for _, t := range themes {
 		ids = append(ids, "theme:"+t.ID)
 	}
+	for _, p := range presets {
+		ids = append(ids, "preset:"+p.ID)
+	}
 	for _, b := range borders {
 		ids = append(ids, "border:"+b.ID)
 	}
@@ -290,6 +293,13 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 		}
 	case hit == "btn:aircols":
 		m.cfg.AirCols = !m.cfg.AirCols
+	case strings.HasPrefix(hit, "preset:"):
+		for _, p := range presets {
+			if "preset:"+p.ID == hit {
+				m.cfg, m.sel, m.selRow = p.build(), nil, nil
+				return m, m.notify(p.Label+" applied · s to save", false)
+			}
+		}
 	case strings.HasPrefix(hit, "theme:"):
 		m.applyTheme(strings.TrimPrefix(hit, "theme:"))
 	case strings.HasPrefix(hit, "sep:"):
