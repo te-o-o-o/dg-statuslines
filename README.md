@@ -1,8 +1,8 @@
 <h1 align="center">dg-statuslines</h1>
 
 <p align="center">
-  A status line builder for Claude Code.<br>
-  Drag widgets into a grid, pick a style, see it live.
+  Drag, drop, nerd out.<br>
+  A TUI to build your Claude Code status line: 33 widgets, gauges, 15 themes, presets and random rolls.
 </p>
 
 <p align="center"><sub>Go · terminal UI · MIT</sub></p>
