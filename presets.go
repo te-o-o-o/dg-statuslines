@@ -8,6 +8,19 @@ type preset struct {
 }
 
 var presets = []preset{
+	{"devpp", "dev++", func() Config {
+		// Hand-picked colours: no theme recolor, the theme is only kept for widgets added later.
+		bar := func(w, col, mode string) Cell {
+			return Cell{Widget: w, Color: col, Bar: "braille", Width: 10, Mode: mode}
+		}
+		cfg := grid("", Config{Gaps: []bool{true, true}, Free: []bool{true}, Sep: "·", Border: "dotted", BorderColor: "teal"},
+			// The empty fourth column is part of the layout: it keeps the grid as wide as the bars.
+			[]Cell{{Widget: "dir", Color: "#59c2ff", Full: true, Sep: "»"}, {Widget: "git", Color: "#aad94c", Align: "right"}, {}, {}},
+			[]Cell{bar("context", "neon", ""), bar("limit5h", "candy", "left"), bar("limit7d", "candy", "left")},
+			[]Cell{{Widget: "text", Color: "white", Text: ".. BzzZzz..", Align: "center", Sep: "⋮"}, {Widget: "reset5h", Color: "green", Sep: "⋮"}, {Widget: "reset7d", Color: "green"}})
+		cfg.Theme = "ayu"
+		return cfg
+	}},
 	{"minimal", "Minimal", func() Config {
 		return grid("catppuccin", Config{Sep: "·"},
 			[]Cell{{Widget: "model", Icon: true, Version: true}, {Widget: "dir"}, {Widget: "git"}})
