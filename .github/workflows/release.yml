@@ -1,0 +1,55 @@
+# Builds slb for every platform and publishes the binaries on a GitHub Release.
+#
+# Triggered by a tag: `git tag v0.1.0 && git push --tags`. slb is pure Go, so a
+# single Linux runner cross-compiles every target. The tag is stamped into the
+# binary (`slb version`).
+#
+# Assets are bare binaries named `slb-<os>-<arch>[.exe]`, plus `checksums.txt`:
+# install.sh and install.ps1 download them by these exact names from the latest
+# release. Nothing is signed, so macOS and Windows may warn on first launch.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          mkdir dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            os=${target%/*}
+            arch=${target#*/}
+            ext=""
+            if [ "$os" = windows ]; then ext=.exe; fi
+            GOOS=$os GOARCH=$arch go build -trimpath \
+              -ldflags "-s -w -X main.version=$GITHUB_REF_NAME" \
+              -o "dist/slb-$os-$arch$ext" .
+          done
+          (cd dist && sha256sum slb-* > checksums.txt)
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "slb $GITHUB_REF_NAME" \
+            --generate-notes

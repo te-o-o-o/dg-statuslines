@@ -39,24 +39,41 @@ Claude Code runs to draw the status line. No bash script to generate, no `jq`.
 
 ## Install
 
-Go 1.27 or later is all it takes:
+Linux, macOS and WSL:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/te-o-o-o/dg-statuslines/main/install.sh | sh
+```
+
+Windows, in PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/te-o-o-o/dg-statuslines/main/install.ps1 | iex
+```
+
+Both scripts download the binary of the latest release for your system, check it against
+the release checksums, and put it in `~/.local/bin` (`%LOCALAPPDATA%\slb` on Windows).
+Then run `slb`, build your line, and install it from the **Install** tab.
+
+To update, run the same command again: the binary is replaced in place, so Claude Code
+keeps running it from the same path. The binaries are not signed, so macOS or Windows may
+warn the first time.
+
+From source, with Go 1.27 or later:
 
 ```bash
 git clone https://github.com/te-o-o-o/dg-statuslines && cd dg-statuslines
 go install .
 ```
 
-This puts `slb` in `$(go env GOPATH)/bin`, usually `~/go/bin`; add it to your `PATH` if it
-is not there yet. Then run `slb`, build your line, and install it from the **Install** tab.
-
-Claude Code runs the binary from the path the Install tab writes. After an update, run
-`go install .` again: the path stays the same, so nothing needs reinstalling.
+To uninstall, delete the binary, then restore `~/.claude/settings.json.bak` or remove the
+`statusLine` key from `~/.claude/settings.json`.
 
 ## Use
 
 | Key | Action |
 |---|---|
-| `slb` | open the builder (`slb help` lists the commands) |
+| `slb` | open the builder (`slb help` lists the commands, `slb version` prints the version) |
 | `1` `2` `3`, `Tab` | Layout, Style and Install tabs |
 | drag | place a widget, move or swap cells, drop on the widget list to remove |
 | `←↑↓→` | select a cell |
@@ -75,11 +92,17 @@ a missing config gives an empty line, not an error.
 | System | Status |
 |---|---|
 | Linux, WSL in Windows Terminal | in daily use |
-| macOS | not tested |
-| Windows, outside WSL | not tested |
+| macOS | built, not tested |
+| Windows, outside WSL | built, not tested |
 
 The 5h and 7d limits only exist for Claude Pro and Max accounts, after the first answer
 of a session. Without them, those widgets simply stay empty.
+
+## Release
+
+Push a version tag: `git tag v0.1.0 && git push origin v0.1.0`. The release workflow
+runs the tests, builds the six binaries (Linux, macOS and Windows, amd64 and arm64) and
+publishes them with their checksums.
 
 ## License
 
