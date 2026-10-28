@@ -83,3 +83,45 @@ spend limit gauge.
 - [ ] A per-project configuration.
 - [ ] `dgsl doctor`: check the install, the config and the terminal.
 - [ ] Honour `NO_COLOR`, and a plain mode for terminals with few colours.
+
+## Nerd ideas
+
+Just ideas, to dig into later. Top three first.
+
+- [ ] **Companion**: a small ASCII creature that lives in the line and reacts to the session:
+      asleep when the cache is cold, restless past 80 % context, eating tokens, panicking
+      near the 5h limit. Animated with Claude Code's `refreshInterval`.
+- [ ] **Sparklines**: `ctx ▁▂▃▅▆█`, `$ ▁▁▂▄▇`, tokens per minute, from a small history kept
+      per `session_id` in `~/.cache/dg-statuslines/`.
+- [ ] **Pace and depletion**: a `│` marker on the 5h and 7d bars for the time elapsed in the
+      window, and "5h empty at 16:40 at this pace".
+- [ ] **Template widget**: any field of the session JSON through `text/template`, such as
+      `{{.cost.total_cost_usd | printf "%.3f"}}`.
+- [ ] **Cache countdown**: "❄ cold in 3m12s" from `prompt_cache.expires_at`.
+- [ ] **Clickable links** (OSC 8) on the pull request, the repository and the branch.
+- [ ] **Layout codes**: `dgsl export` prints `dgsl:H4sIA…` (gzip + base64), `dgsl import`
+      loads one. Share status lines like Minecraft seeds.
+- [ ] **Subagent rows** with a sparkline each, from `tokenSamples` in `subagentStatusLine`.
+- [ ] **Powerline segments**: coloured blocks chained by `` arrows (rounded, slanted and
+      flame variants), with a fallback for terminals without a Nerd Font.
+- [ ] **Truecolor gradients** along the bars.
+- [ ] **System widgets**: load average, battery, `kubectl` context, `AWS_PROFILE`, the song
+      playing (`playerctl`).
+- [ ] **Easter egg**: the Konami code in the builder starts a Matrix rain in the preview.
+
+## Beyond the status line
+
+What else Claude Code lets us draw or change, from its docs. Ideas for a companion plugin.
+
+- [ ] **Mod pane**: a sidebar beside the transcript (or a framed region above the prompt),
+      with tabs, buttons and fields. A live dashboard: context chart, cost, limits.
+- [ ] **Mod band**: the strip above the prompt, redrawn on a timer. Home for the companion.
+- [ ] **Redraw Claude Code's own parts** from a mod: the spinner, tool call rows, the hint
+      under the prompt, the footer mode labels.
+- [ ] **`/dgsl` command** from a mod: open the builder or switch preset without leaving
+      the session.
+- [ ] **Claude Code colour theme** (`~/.claude/themes/`, shippable in a plugin) matched to
+      each dgsl theme.
+- [ ] **Spinner verbs and tips** (`spinnerVerbs`, `spinnerTipsOverride`): a themed pack,
+      e.g. "Bzzzing…", "Compiling the hive…".
+- [ ] **Notification hook**: a sound or desktop notification when Claude finishes or waits.
