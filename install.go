@@ -150,9 +150,9 @@ func (m model) installTab() string {
 			errStyle.Render("✗ ") + "Cannot read ~/.claude/settings.json: " + m.planErr.Error() + "\n" +
 			faint.Render("Fix the file, then reopen this tab.")
 	}
-	status := warnStyle.Render("○ ") + "slb is not yet the Claude Code status line"
+	status := warnStyle.Render("○ ") + "dgsl is not yet the Claude Code status line"
 	if m.oldCmd == m.newCmd {
-		status = okStyle.Render("✓ ") + "slb is the Claude Code status line"
+		status = okStyle.Render("✓ ") + "dgsl is the Claude Code status line"
 	}
 	cfgState := faint.Render("  ✓ saved")
 	if m.dirty() {
@@ -161,7 +161,7 @@ func (m model) installTab() string {
 	lines := []string{
 		m.titled(heading.Render("INSTALLATION")), "",
 		faint.Render("Status      ") + status,
-		faint.Render("Config      ") + "~/.claude/statusline-builder.json" + cfgState,
+		faint.Render("Config      ") + "~/.claude/dg-statuslines.json" + cfgState,
 		"",
 	}
 	if m.oldCmd != m.newCmd {

@@ -151,7 +151,7 @@ func (m model) styleTab() string {
 		auto = "auto (light)"
 	}
 	app := chips(opt{"ui:", auto, m.cfg.UI == ""}, opt{"ui:ocean", "Ocean", m.cfg.UI == "ocean"}, opt{"ui:paper", "Paper", m.cfg.UI == "paper"}) +
-		faint.Render("   colours of slb itself")
+		faint.Render("   colours of dgsl itself")
 	parts := []string{
 		field("App", app), "",
 		field("Theme", strings.Join(themeRows, "\n\n")), "",

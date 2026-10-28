@@ -1,9 +1,9 @@
 #!/bin/sh
-# Installs the latest slb release on Linux, macOS or WSL.
+# Installs the latest dgsl release on Linux, macOS or WSL.
 #
 #   curl -fsSL https://raw.githubusercontent.com/te-o-o-o/dg-statuslines/main/install.sh | sh
 #
-# The binary goes to ~/.local/bin. Running the script again updates slb in place,
+# The binary goes to ~/.local/bin. Running the script again updates dgsl in place,
 # so the path Claude Code runs never changes.
 set -eu
 
@@ -13,15 +13,15 @@ dir="$HOME/.local/bin"
 case "$(uname -s)" in
   Linux) os=linux ;;
   Darwin) os=darwin ;;
-  *) echo "slb: unsupported system $(uname -s). On Windows, use install.ps1." >&2; exit 1 ;;
+  *) echo "dgsl: unsupported system $(uname -s). On Windows, use install.ps1." >&2; exit 1 ;;
 esac
 case "$(uname -m)" in
   x86_64 | amd64) arch=amd64 ;;
   arm64 | aarch64) arch=arm64 ;;
-  *) echo "slb: unsupported architecture $(uname -m)." >&2; exit 1 ;;
+  *) echo "dgsl: unsupported architecture $(uname -m)." >&2; exit 1 ;;
 esac
 
-file="slb-$os-$arch"
+file="dgsl-$os-$arch"
 base="https://github.com/$repo/releases/latest/download"
 tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
@@ -37,16 +37,16 @@ else
   have=$(shasum -a 256 "$tmp" | cut -d' ' -f1)
 fi
 if [ -z "$want" ] || [ "$want" != "$have" ]; then
-  echo "slb: checksum mismatch, nothing installed." >&2
+  echo "dgsl: checksum mismatch, nothing installed." >&2
   exit 1
 fi
 
 mkdir -p "$dir"
 chmod +x "$tmp"
-mv "$tmp" "$dir/slb"
-echo "Installed $("$dir/slb" version) in $dir/slb"
+mv "$tmp" "$dir/dgsl"
+echo "Installed $("$dir/dgsl" version) in $dir/dgsl"
 
 case ":$PATH:" in
-  *":$dir:"*) echo "Run: slb" ;;
-  *) echo "Add $dir to your PATH, then run: slb" ;;
+  *":$dir:"*) echo "Run: dgsl" ;;
+  *) echo "Add $dir to your PATH, then run: dgsl" ;;
 esac

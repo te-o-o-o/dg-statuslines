@@ -576,7 +576,7 @@ func titledBox(name, content string, w int) string {
 }
 
 func (m model) header() string {
-	left := " " + title.Render("slb") + "   "
+	left := " " + title.Render("dg-statuslines") + "   "
 	for i, n := range tabNames {
 		st := faint
 		if i == m.tab {

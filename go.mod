@@ -1,4 +1,4 @@
-module slb
+module dgsl
 
 go 1.27.0
 
