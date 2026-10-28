@@ -7,6 +7,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	tea "github.com/charmbracelet/bubbletea"
+	zone "github.com/lrstanley/bubblezone"
 )
 
 func settingsPath() string {
@@ -125,4 +128,54 @@ func applyInstall(newContent []byte) error {
 		return err
 	}
 	return os.WriteFile(p, newContent, 0o644)
+}
+
+func (m *model) install() tea.Cmd {
+	if m.planErr != nil {
+		return m.notify("settings.json unreadable: "+m.planErr.Error(), true)
+	}
+	if cmd := m.save(); m.dirty() {
+		return cmd // saving the config failed
+	}
+	if err := applyInstall(m.plan); err != nil {
+		return m.notify("Cannot install: "+err.Error(), true)
+	}
+	m.setTab(2) // re-read settings.json to refresh the status
+	return m.notify("Installed in Claude Code", false)
+}
+
+func (m model) installTab() string {
+	if m.planErr != nil {
+		return m.titled(heading.Render("INSTALLATION")) + "\n\n" +
+			errStyle.Render("✗ ") + "Cannot read ~/.claude/settings.json: " + m.planErr.Error() + "\n" +
+			faint.Render("Fix the file, then reopen this tab.")
+	}
+	status := warnStyle.Render("○ ") + "slb is not yet the Claude Code status line"
+	if m.oldCmd == m.newCmd {
+		status = okStyle.Render("✓ ") + "slb is the Claude Code status line"
+	}
+	cfgState := faint.Render("  ✓ saved")
+	if m.dirty() {
+		cfgState = warnStyle.Render("  ● unsaved")
+	}
+	lines := []string{
+		m.titled(heading.Render("INSTALLATION")), "",
+		faint.Render("Status      ") + status,
+		faint.Render("Config      ") + "~/.claude/statusline-builder.json" + cfgState,
+		"",
+	}
+	if m.oldCmd != m.newCmd {
+		lines = append(lines,
+			faint.Render("Planned change in ~/.claude/settings.json"),
+			"  "+errStyle.Render("- "+m.oldCmd),
+			"  "+okStyle.Render("+ "+m.newCmd),
+			"",
+		)
+	}
+	lines = append(lines,
+		zone.Mark("btn:install", button.Background(accent).Foreground(onAccent).Bold(true).Render("Save and install")),
+		"",
+		faint.Render("A copy of settings.json is kept in settings.json.bak before each change."),
+	)
+	return strings.Join(lines, "\n")
 }
