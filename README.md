@@ -23,9 +23,11 @@ Claude Code runs to draw the status line. No bash script to generate, no `jq`.
 
 - **Grid layout**: rows of cells, filled by drag and drop. Columns line up like a CSS
   grid, and each cell sits left, center or right in its column.
-- **13 widgets**: model (with `✳` and version), directory, git branch, user@host, cost,
+- **33 widgets**: model (with `✳` and version), directory, git branch, user@host, cost,
   lines added and removed, context, 5h and 7d limits with their reset times, free text,
-  and a spacer to leave a real gap.
+  and a spacer to leave a real gap. 20 more wait in the **widget catalogue** (`+`): session
+  name and time, Claude Code version, effort, fast mode, repository, worktree, pull request,
+  tokens, prompt cache, spend limit… Only the widgets you pick show in the list.
 - **14 progress bar styles** for the gauges, with caps, width, used or left, and colour
   thresholds.
 - **15 themes**: Classic, Catppuccin, Nord, Dracula, Tokyo Night, Gruvbox, Rosé Pine,
@@ -97,6 +99,7 @@ To uninstall, delete the binary, then restore `~/.claude/settings.json.bak` or r
 | `←↑↓→` | select a cell |
 | `[` `]` | previous or next settings section |
 | `x` | remove the selected widget |
+| `+` | open the widget catalogue: type to filter, `space` to add or remove a widget |
 | `r` / `R` | random layout / previous roll |
 | `s` | save |
 | `q` | quit |

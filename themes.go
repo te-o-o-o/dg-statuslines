@@ -70,19 +70,19 @@ func init() {
 // color returns a widget's color in the theme ("" = widget default color).
 func (t theme) color(widget string) string {
 	switch widget {
-	case "model":
+	case "model", "version", "effort", "fast", "thinking":
 		return t.Model
-	case "dir":
+	case "dir", "project", "repo", "added":
 		return t.Dir
-	case "git":
+	case "git", "worktree", "pr":
 		return t.Git
-	case "userhost":
+	case "userhost", "session", "agent":
 		return t.User
-	case "cost":
+	case "cost", "tokens", "ctxsize", "cache":
 		return t.Cost
-	case "reset5h", "reset7d":
+	case "reset5h", "reset7d", "duration", "apitime":
 		return t.Reset
-	case "text":
+	case "text", "style", "vim", "over200k":
 		return t.Text
 	}
 	if isGauge(widget) {

@@ -42,26 +42,56 @@ type Config struct {
 	BorderColor string   `json:"border_color,omitempty"` // "" = dim gray
 	Theme       string   `json:"theme,omitempty"`        // last applied theme, also used for widgets added later
 	UI          string   `json:"ui,omitempty"`           // builder appearance ("" = auto); no effect on the render
+	Palette     []string `json:"palette,omitempty"`      // widgets listed in the builder (nil = the non-extra ones); no effect on the render
 }
 
-// Widget id -> label shown in the builder (palette order).
-var widgets = []struct{ ID, Label string }{
-	{"model", "Model"},
-	{"dir", "Directory"},
-	{"git", "Git branch"},
-	{"userhost", "user@host"},
-	{"cost", "Cost"},
-	{"lines", "Lines +/−"},
-	{"context", "Context"},
-	{"limit5h", "Limit 5h"},
-	{"limit7d", "Limit 7d"},
-	{"reset5h", "Reset 5h"},
-	{"reset7d", "Reset 7d"},
-	{"text", "Text"},
-	{"spacer", "Spacer"},
+// widgetInfo describes a widget for the builder. Group orders the widget list and
+// the catalogue; Extra widgets stay in the catalogue until the user adds them.
+type widgetInfo struct {
+	ID, Label, Group, Desc string
+	Extra                  bool
 }
 
-func isGauge(w string) bool { return w == "context" || w == "limit5h" || w == "limit7d" }
+// Every widget, in list order. Groups appear in the order of their first widget.
+var widgets = []widgetInfo{
+	{"model", "Model", "Session", "model name, with ✳ and version", false},
+	{"dir", "Directory", "Session", "current directory, short or full", false},
+	{"git", "Git branch", "Session", "current branch", false},
+	{"userhost", "user@host", "Session", "user and machine", false},
+	{"session", "Session name", "Session", "set with --name or /rename, or the AI title", true},
+	{"duration", "Session time", "Session", "time the session has been running", true},
+	{"apitime", "API time", "Session", "time spent waiting for the API", true},
+	{"version", "Claude version", "Session", "Claude Code version", true},
+	{"agent", "Agent", "Session", "agent name, with --agent", true},
+	{"style", "Output style", "Session", "hidden while it is the default one", true},
+	{"vim", "Vim mode", "Session", "NORMAL, INSERT… when vim mode is on", true},
+	{"effort", "Effort", "Model", "reasoning effort, low to max", true},
+	{"fast", "Fast mode", "Model", "shown while fast mode is on", true},
+	{"thinking", "Thinking", "Model", "shown while extended thinking is on", true},
+	{"project", "Project", "Workspace", "directory Claude Code was launched in", true},
+	{"repo", "Repository", "Workspace", "owner/name of the origin remote", true},
+	{"worktree", "Worktree", "Workspace", "linked git worktree name", true},
+	{"added", "Added dirs", "Workspace", "directories added with /add-dir", true},
+	{"pr", "Pull request", "Workspace", "open PR or MR and its review state", true},
+	{"context", "Context", "Gauges", "context window used", false},
+	{"limit5h", "Limit 5h", "Gauges", "5-hour limit, Pro and Max", false},
+	{"limit7d", "Limit 7d", "Gauges", "7-day limit, Pro and Max", false},
+	{"spend", "Spend limit", "Gauges", "spend limit, behind a Claude apps gateway", true},
+	{"tokens", "Tokens", "Context", "input and output tokens in the context", true},
+	{"ctxsize", "Context size", "Context", "context window size, 200k or 1M", true},
+	{"cache", "Prompt cache", "Context", "warm or cold, with the hit ratio", true},
+	{"over200k", "Over 200k", "Context", "warning past 200k tokens", true},
+	{"cost", "Cost", "Activity", "session cost in USD", false},
+	{"lines", "Lines +/−", "Activity", "lines added and removed", false},
+	{"reset5h", "Reset 5h", "Activity", "when the 5-hour limit resets", false},
+	{"reset7d", "Reset 7d", "Activity", "when the 7-day limit resets", false},
+	{"text", "Text", "Activity", "any text you type", false},
+	{"spacer", "Spacer", "Layout", "an empty gap of a chosen width", false},
+}
+
+func isGauge(w string) bool {
+	return w == "context" || w == "limit5h" || w == "limit7d" || w == "spend"
+}
 
 func (c Config) free(i int) bool { return i < len(c.Free) && c.Free[i] }
 
@@ -105,27 +135,71 @@ type rateWindow struct {
 }
 
 // Subset of the Claude Code session JSON used by the widgets.
+// Fields: https://code.claude.com/docs/en/statusline#available-data
 type session struct {
-	Cwd   string `json:"cwd"`
-	Model struct {
+	Cwd         string `json:"cwd"`
+	SessionName string `json:"session_name"`
+	Version     string `json:"version"`
+	Model       struct {
 		ID          string `json:"id"`
 		DisplayName string `json:"display_name"`
 	} `json:"model"`
 	Workspace struct {
-		CurrentDir string `json:"current_dir"`
+		CurrentDir  string   `json:"current_dir"`
+		ProjectDir  string   `json:"project_dir"`
+		AddedDirs   []string `json:"added_dirs"`
+		GitWorktree string   `json:"git_worktree"`
+		Repo        struct {
+			Owner string `json:"owner"`
+			Name  string `json:"name"`
+		} `json:"repo"`
 	} `json:"workspace"`
 	Cost struct {
-		TotalCostUSD      *float64 `json:"total_cost_usd"`
-		TotalLinesAdded   *int     `json:"total_lines_added"`
-		TotalLinesRemoved *int     `json:"total_lines_removed"`
+		TotalCostUSD       *float64 `json:"total_cost_usd"`
+		TotalDurationMs    *float64 `json:"total_duration_ms"`
+		TotalAPIDurationMs *float64 `json:"total_api_duration_ms"`
+		TotalLinesAdded    *int     `json:"total_lines_added"`
+		TotalLinesRemoved  *int     `json:"total_lines_removed"`
 	} `json:"cost"`
 	ContextWindow struct {
-		UsedPercentage *float64 `json:"used_percentage"`
+		UsedPercentage    *float64 `json:"used_percentage"`
+		TotalInputTokens  *float64 `json:"total_input_tokens"`
+		TotalOutputTokens *float64 `json:"total_output_tokens"`
+		ContextWindowSize *float64 `json:"context_window_size"`
 	} `json:"context_window"`
+	Exceeds200k bool `json:"exceeds_200k_tokens"`
+	PromptCache *struct {
+		Warm     bool     `json:"warm"`
+		HitRatio *float64 `json:"hit_ratio"`
+	} `json:"prompt_cache"`
+	FastMode bool `json:"fast_mode"`
+	Effort   struct {
+		Level string `json:"level"`
+	} `json:"effort"`
+	Thinking struct {
+		Enabled bool `json:"enabled"`
+	} `json:"thinking"`
 	RateLimits struct {
-		FiveHour *rateWindow `json:"five_hour"`
-		SevenDay *rateWindow `json:"seven_day"`
+		FiveHour   *rateWindow `json:"five_hour"`
+		SevenDay   *rateWindow `json:"seven_day"`
+		SpendLimit *rateWindow `json:"spend_limit"`
 	} `json:"rate_limits"`
+	OutputStyle struct {
+		Name string `json:"name"`
+	} `json:"output_style"`
+	Vim struct {
+		Mode string `json:"mode"`
+	} `json:"vim"`
+	Agent struct {
+		Name string `json:"name"`
+	} `json:"agent"`
+	PR *struct {
+		Number      int    `json:"number"`
+		ReviewState string `json:"review_state"`
+	} `json:"pr"`
+	Worktree struct {
+		Name string `json:"name"`
+	} `json:"worktree"`
 }
 
 func (s session) dir() string {
@@ -299,6 +373,25 @@ func humanize(d time.Duration) string {
 	return fmt.Sprintf("%ds", s)
 }
 
+// kilo shortens a token count: 950, 15.5k, 1M.
+func kilo(n float64) string {
+	switch {
+	case n >= 1e6:
+		return strings.TrimSuffix(fmt.Sprintf("%.1f", n/1e6), ".0") + "M"
+	case n >= 1e3:
+		return strings.TrimSuffix(fmt.Sprintf("%.1f", n/1e3), ".0") + "k"
+	}
+	return fmt.Sprintf("%.0f", n)
+}
+
+// ms formats a duration in milliseconds from the session JSON, "" if absent.
+func ms(v *float64) string {
+	if v == nil {
+		return ""
+	}
+	return humanize(time.Duration(*v) * time.Millisecond)
+}
+
 func reset(c Cell, w *rateWindow, label string, withDay bool) string {
 	if w == nil || w.ResetsAt == nil {
 		return ""
@@ -386,6 +479,102 @@ func cellValue(c Cell, s session) string {
 		return reset(c, s.RateLimits.SevenDay, "7d ↻", true)
 	case "text":
 		return paint(c.Text, col)
+	case "spend":
+		return gauge(c, usedOf(s.RateLimits.SpendLimit), "$")
+	case "session":
+		return paint(s.SessionName, col)
+	case "duration":
+		if d := ms(s.Cost.TotalDurationMs); d != "" {
+			return dim("⏱") + " " + paint(d, col)
+		}
+	case "apitime":
+		if d := ms(s.Cost.TotalAPIDurationMs); d != "" {
+			return dim("api") + " " + paint(d, col)
+		}
+	case "version":
+		if s.Version != "" {
+			return paint("v"+s.Version, col)
+		}
+	case "agent":
+		return paint(s.Agent.Name, col)
+	case "style":
+		if s.OutputStyle.Name != "default" {
+			return paint(s.OutputStyle.Name, col)
+		}
+	case "vim":
+		return paint(s.Vim.Mode, col)
+	case "effort":
+		if s.Effort.Level != "" {
+			return dim("effort") + " " + paint(s.Effort.Level, col)
+		}
+	case "fast":
+		if s.FastMode {
+			return paint("↯ fast", col)
+		}
+	case "thinking":
+		if s.Thinking.Enabled {
+			return paint("thinking", col)
+		}
+	case "project":
+		if s.Workspace.ProjectDir != "" {
+			return paint(filepath.Base(s.Workspace.ProjectDir), col)
+		}
+	case "repo":
+		if r := s.Workspace.Repo; r.Owner != "" && r.Name != "" {
+			return paint(r.Owner+"/"+r.Name, col)
+		}
+	case "worktree":
+		wt := s.Workspace.GitWorktree
+		if wt == "" {
+			wt = s.Worktree.Name
+		}
+		if wt != "" {
+			return dim("wt") + " " + paint(wt, col)
+		}
+	case "added":
+		switch n := len(s.Workspace.AddedDirs); {
+		case n == 1:
+			return paint("+1 dir", col)
+		case n > 1:
+			return paint(fmt.Sprintf("+%d dirs", n), col)
+		}
+	case "pr":
+		if s.PR == nil || s.PR.Number == 0 {
+			return ""
+		}
+		v := paint(fmt.Sprintf("#%d", s.PR.Number), col)
+		if s.PR.ReviewState != "" {
+			v += " " + dim(strings.ReplaceAll(s.PR.ReviewState, "_", " "))
+		}
+		return v
+	case "tokens":
+		cw := s.ContextWindow
+		if cw.TotalInputTokens == nil || cw.TotalOutputTokens == nil {
+			return ""
+		}
+		return dim("in") + " " + paint(kilo(*cw.TotalInputTokens), col) + " " + dim("out") + " " + paint(kilo(*cw.TotalOutputTokens), col)
+	case "ctxsize":
+		if n := s.ContextWindow.ContextWindowSize; n != nil && *n > 0 {
+			return paint(kilo(*n), col)
+		}
+	case "cache":
+		pc := s.PromptCache
+		if pc == nil {
+			return ""
+		}
+		state := "cold"
+		if pc.Warm {
+			state = "warm"
+		}
+		v := dim("cache") + " " + paint(state, col)
+		if pc.HitRatio != nil {
+			v += " " + dim(fmt.Sprintf("%.0f%%", *pc.HitRatio*100))
+		}
+		return v
+	case "over200k":
+		if s.Exceeds200k {
+			return paint("⚠ >200k", col)
+		}
 	}
 	return ""
 }

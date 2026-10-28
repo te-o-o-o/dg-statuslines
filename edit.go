@@ -54,6 +54,12 @@ type model struct {
 	toast   string
 	toastN  int
 
+	// Widget catalogue window.
+	cat       bool
+	catQuery  string // filter typed in the window
+	catSel    int    // selected widget among those matching
+	catScroll int
+
 	// Install tab, recomputed each time the tab opens.
 	plan           []byte
 	oldCmd, newCmd string
@@ -92,13 +98,28 @@ func edit() error {
 	cwd, _ := os.Getwd()
 	now := time.Now().Unix()
 	sample, _ := json.Marshal(map[string]any{
-		"model":          map[string]any{"id": "claude-opus-5-5", "display_name": "Opus"},
-		"workspace":      map[string]any{"current_dir": cwd},
-		"cost":           map[string]any{"total_cost_usd": 0.42, "total_lines_added": 156, "total_lines_removed": 23},
-		"context_window": map[string]any{"used_percentage": 23},
+		"model":        map[string]any{"id": "claude-opus-5-5", "display_name": "Opus"},
+		"session_name": "fix-login-flow",
+		"version":      "2.1.90",
+		"workspace": map[string]any{"current_dir": cwd, "project_dir": cwd, "added_dirs": []string{"../shared"},
+			"git_worktree": "feature-xyz", "repo": map[string]any{"owner": "acme", "name": "webshop"}},
+		"cost": map[string]any{"total_cost_usd": 0.42, "total_lines_added": 156, "total_lines_removed": 23,
+			"total_duration_ms": 4320000, "total_api_duration_ms": 750000},
+		"context_window": map[string]any{"used_percentage": 23, "total_input_tokens": 46000,
+			"total_output_tokens": 1200, "context_window_size": 200000},
+		"exceeds_200k_tokens": true,
+		"prompt_cache":        map[string]any{"warm": true, "hit_ratio": 0.91},
+		"fast_mode":           true,
+		"effort":              map[string]any{"level": "high"},
+		"thinking":            map[string]any{"enabled": true},
+		"output_style":        map[string]any{"name": "Explanatory"},
+		"vim":                 map[string]any{"mode": "NORMAL"},
+		"agent":               map[string]any{"name": "reviewer"},
+		"pr":                  map[string]any{"number": 1234, "review_state": "pending"},
 		"rate_limits": map[string]any{
-			"five_hour": map[string]any{"used_percentage": 62.5, "resets_at": now + 2*3600 + 12*60},
-			"seven_day": map[string]any{"used_percentage": 85.2, "resets_at": now + 3*86400 + 4*3600},
+			"five_hour":   map[string]any{"used_percentage": 62.5, "resets_at": now + 2*3600 + 12*60},
+			"seven_day":   map[string]any{"used_percentage": 85.2, "resets_at": now + 3*86400 + 4*3600},
+			"spend_limit": map[string]any{"used_percentage": 41, "resets_at": now + 12*86400},
 		},
 	})
 
@@ -133,7 +154,7 @@ func parseCell(id string) (pos, bool) {
 
 // hit returns the id of the zone under the mouse ("" if none).
 func (m model) hit(msg tea.MouseMsg) string {
-	ids := []string{"tab:0", "tab:1", "tab:2", "btn:install", "palette"}
+	ids := []string{"tab:0", "tab:1", "tab:2", "btn:install", "palette", "btn:catalogue"}
 	for r, row := range m.cfg.Rows {
 		ids = append(ids, fmt.Sprintf("gap:%d", r), fmt.Sprintf("free:%d", r))
 		for c := range row {
@@ -167,12 +188,12 @@ func (m model) hit(msg tea.MouseMsg) string {
 	ids = append(ids, "border:", "bcolor:")
 	ids = append(ids, "btn:+row", "btn:-row", "btn:+col", "btn:-col", "btn:airrows", "btn:aircols")
 	// Nested zones (pal:… inside palette) are checked before their container.
-	for _, id := range ids[5:] {
+	for _, id := range ids[6:] {
 		if zone.Get(id).InBounds(msg) {
 			return id
 		}
 	}
-	for _, id := range ids[:5] {
+	for _, id := range ids[:6] {
 		if zone.Get(id).InBounds(msg) {
 			return id
 		}
@@ -192,6 +213,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.key(msg)
 	case tea.MouseMsg:
 		m.mx, m.my = msg.X, msg.Y
+		if m.cat {
+			return m.catMouse(msg)
+		}
 		hit := m.hit(msg)
 		switch msg.Action {
 		case tea.MouseActionPress:
@@ -272,6 +296,8 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 		m.setTab(t)
 	case hit == "btn:install":
 		return m, m.install()
+	case hit == "btn:catalogue":
+		m.cat, m.catQuery, m.catSel, m.catScroll = true, "", 0, 0
 	case strings.HasPrefix(hit, "pal:"):
 		m.drag = &drag{cell: Cell{Widget: strings.TrimPrefix(hit, "pal:")}}
 	case strings.HasPrefix(hit, "free:"):
@@ -417,6 +443,9 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.Type == tea.KeyCtrlC {
 		return m, tea.Quit
 	}
+	if m.cat {
+		return m.catKey(msg)
+	}
 	if m.editing && m.sel != nil {
 		c := &m.cfg.Rows[m.sel.r][m.sel.c]
 		switch msg.Type {
@@ -449,6 +478,9 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if c := m.selCell(); c != nil && c.Widget == "text" {
 				m.editing = true
 			}
+			return m, nil
+		case "+":
+			m.cat, m.catQuery, m.catSel, m.catScroll = true, "", 0, 0
 			return m, nil
 		case "x":
 			if m.sel != nil {
@@ -632,7 +664,7 @@ func (m model) footer() string {
 	case m.tab == 0 && m.sel != nil:
 		return hints("←↑↓→", "cell", "[ ]", "section", "x", "remove", "esc", "back", "s", "save")
 	case m.tab == 0:
-		return hints("drag", "place", "click", "edit", "1-3", "tab", "s", "save", "q", "quit")
+		return hints("drag", "place", "click", "edit", "+", "more widgets", "1-3", "tab", "s", "save", "q", "quit")
 	case m.tab == 1:
 		return hints("click", "choose", "1-3", "tab", "s", "save", "q", "quit")
 	}
@@ -702,22 +734,29 @@ func (m model) View() string {
 	}
 	view = strings.Join(lines, "\n")
 
+	if m.cat {
+		box, x, y := m.catBox()
+		view = overlay(view, box, x, y)
+	}
 	if m.drag != nil {
 		view = overlay(view, dragLabel.Render("⠿ "+label(m.drag.cell.Widget)), m.mx+2, m.my)
 	}
 	return view
 }
 
-// overlay draws fg on line y of bg starting at column x (label following the cursor).
+// overlay draws fg over bg with its top-left corner at column x, line y
+// (label following the cursor, catalogue window).
 func overlay(bg, fg string, x, y int) string {
 	lines := strings.Split(bg, "\n")
-	if y < 0 || y >= len(lines) {
-		return bg
+	for i, f := range strings.Split(fg, "\n") {
+		if y+i < 0 || y+i >= len(lines) {
+			continue
+		}
+		l := lines[y+i]
+		if w := ansi.StringWidth(l); w < x {
+			l += strings.Repeat(" ", x-w)
+		}
+		lines[y+i] = ansi.Truncate(l, x, "") + "\x1b[0m" + f + "\x1b[0m" + ansi.TruncateLeft(l, x+ansi.StringWidth(f), "")
 	}
-	l := lines[y]
-	if w := ansi.StringWidth(l); w < x {
-		l += strings.Repeat(" ", x-w)
-	}
-	lines[y] = ansi.Truncate(l, x, "") + "\x1b[0m" + fg + ansi.TruncateLeft(l, x+ansi.StringWidth(fg), "")
 	return strings.Join(lines, "\n")
 }
