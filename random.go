@@ -121,6 +121,12 @@ func cloneConfig(c Config) Config {
 }
 
 // roll draws a new layout and appends it to the history (dropping any rolls after the current one).
+// replace swaps in a new layout, keeping the builder settings it doesn't carry.
+func (m *model) replace(c Config) {
+	c.UI, c.Palette = m.cfg.UI, m.cfg.Palette
+	m.cfg, m.sel, m.selSep = c, nil, nil
+}
+
 func (m *model) roll() {
 	if m.rng == nil {
 		m.rng = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
@@ -128,7 +134,7 @@ func (m *model) roll() {
 	c := randomConfig(m.rng)
 	m.rolls = append(m.rolls[:m.rollIdx+min(1, len(m.rolls))], c)
 	m.rollIdx = len(m.rolls) - 1
-	m.cfg, m.sel, m.selSep = cloneConfig(c), nil, nil
+	m.replace(cloneConfig(c))
 }
 
 // prevRoll goes back to the previous roll, if any.
@@ -137,6 +143,6 @@ func (m *model) prevRoll() bool {
 		return false
 	}
 	m.rollIdx--
-	m.cfg, m.sel, m.selSep = cloneConfig(m.rolls[m.rollIdx]), nil, nil
+	m.replace(cloneConfig(m.rolls[m.rollIdx]))
 	return true
 }

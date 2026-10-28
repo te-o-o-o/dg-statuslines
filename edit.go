@@ -326,7 +326,7 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	case strings.HasPrefix(hit, "preset:"):
 		for _, p := range presets {
 			if "preset:"+p.ID == hit {
-				m.cfg, m.sel, m.selSep = p.build(), nil, nil
+				m.replace(p.build())
 				return m, m.notify(p.Label+" applied · s to save", false)
 			}
 		}
