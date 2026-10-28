@@ -34,7 +34,7 @@ Claude Code runs to draw the status line. No bash script to generate, no `jq`.
   Solarized, One Dark, Monokai, Everforest, Kanagawa, Ayu, GitHub Dark and Mono.
 - **Style**: 11 separators, 5 borders around the whole line, blank lines between rows,
   spaced columns, 24 colours plus truecolor themes.
-- **6 presets** to start from, and a **random** layout with a history to step back.
+- **7 presets** to start from, and a **random** layout with a history to step back.
 - **Live preview** pinned at the top of the builder.
 - **Safe install**: only the `statusLine` key of `~/.claude/settings.json` changes, after a
   backup to `settings.json.bak`.
