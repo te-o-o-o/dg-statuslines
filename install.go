@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func settingsPath() string {
@@ -57,6 +58,12 @@ func planInstall() (newContent []byte, oldCmd, newCmd string, err error) {
 	}
 	if exe, err = filepath.EvalSymlinks(exe); err != nil {
 		return nil, "", "", err
+	}
+	// Forward slashes, as Claude Code's docs ask on Windows; quotes when the path
+	// has spaces, since the command goes through a shell.
+	exe = filepath.ToSlash(exe)
+	if strings.ContainsRune(exe, ' ') {
+		exe = `"` + exe + `"`
 	}
 	newCmd = exe + " render"
 	line, _ := json.Marshal(struct {
