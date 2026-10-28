@@ -91,6 +91,14 @@ func edit() error {
 			cfg.Rows[i] = append(cfg.Rows[i], Cell{})
 		}
 	}
+	// No widget list chosen yet: the non-extra widgets.
+	if cfg.Palette == nil {
+		for _, w := range widgets {
+			if !w.Extra {
+				cfg.Palette = append(cfg.Palette, w.ID)
+			}
+		}
+	}
 	if err == nil {
 		saved = configJSON(cfg)
 	}
@@ -297,7 +305,7 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	case hit == "btn:install":
 		return m, m.install()
 	case hit == "btn:catalogue":
-		m.cat, m.catQuery, m.catSel, m.catScroll = true, "", 0, 0
+		m.cat = true
 	case strings.HasPrefix(hit, "pal:"):
 		m.drag = &drag{cell: Cell{Widget: strings.TrimPrefix(hit, "pal:")}}
 	case strings.HasPrefix(hit, "free:"):
@@ -480,7 +488,7 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case "+":
-			m.cat, m.catQuery, m.catSel, m.catScroll = true, "", 0, 0
+			m.cat = true
 			return m, nil
 		case "x":
 			if m.sel != nil {
@@ -735,8 +743,8 @@ func (m model) View() string {
 	view = strings.Join(lines, "\n")
 
 	if m.cat {
-		box, x, y := m.catBox()
-		view = overlay(view, box, x, y)
+		box, x := m.catBox()
+		view = overlay(view, box, x, catTop)
 	}
 	if m.drag != nil {
 		view = overlay(view, dragLabel.Render("⠿ "+label(m.drag.cell.Widget)), m.mx+2, m.my)
