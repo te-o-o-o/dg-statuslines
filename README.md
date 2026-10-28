@@ -69,6 +69,24 @@ go install .
 To uninstall, delete the binary, then restore `~/.claude/settings.json.bak` or remove the
 `statusLine` key from `~/.claude/settings.json`.
 
+### macOS
+
+- `~/.local/bin` is not on the `PATH` by default. With zsh, the default shell:
+
+  ```bash
+  echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+  ```
+
+- Installed with the script, the binary is not quarantined. Downloaded from the release
+  page in a browser, macOS refuses to open it until you clear the flag:
+
+  ```bash
+  xattr -d com.apple.quarantine ~/.local/bin/slb
+  ```
+
+- Themes use truecolor. If colours look off in Terminal.app, try iTerm2, Ghostty, kitty
+  or WezTerm.
+
 ## Use
 
 | Key | Action |
