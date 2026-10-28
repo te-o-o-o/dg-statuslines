@@ -38,9 +38,6 @@ func (m model) onGrid(id string) bool {
 
 // inPalette: offered in the Layout tab, because it was chosen or is on the grid.
 func (m model) inPalette(w widgetInfo) bool {
-	if m.cfg.Palette == nil {
-		return !w.Extra || m.onGrid(w.ID)
-	}
 	return slices.Contains(m.cfg.Palette, w.ID) || m.onGrid(w.ID)
 }
 
@@ -48,13 +45,6 @@ func (m model) inPalette(w widgetInfo) bool {
 func (m *model) toggleWidget(id string) tea.Cmd {
 	if m.onGrid(id) {
 		return m.notify(label(id)+" is on the grid: remove it from there first", false)
-	}
-	if m.cfg.Palette == nil {
-		for _, w := range widgets {
-			if !w.Extra {
-				m.cfg.Palette = append(m.cfg.Palette, w.ID)
-			}
-		}
 	}
 	if i := slices.Index(m.cfg.Palette, id); i >= 0 {
 		m.cfg.Palette = slices.Delete(m.cfg.Palette, i, i+1)
@@ -66,6 +56,20 @@ func (m *model) toggleWidget(id string) tea.Cmd {
 
 // catLine: one line of the catalogue list, a group heading (id "") or a widget.
 type catLine struct{ id, text string }
+
+// catTop: screen line of the window's top edge, just under the header.
+const catTop = 1
+
+// catWidgets: the line index of each widget in lines, in order.
+func catWidgets(lines []catLine) []int {
+	var at []int
+	for i, l := range lines {
+		if l.id != "" {
+			at = append(at, i)
+		}
+	}
+	return at
+}
 
 // catItems: the widgets matching the filter, under their group headings.
 func (m model) catItems() []catLine {
@@ -113,8 +117,8 @@ func (m model) catRoom() int {
 	return max(3, h-10)
 }
 
-// catBox draws the window, and returns it with its position on screen.
-func (m model) catBox() (box string, x, y int) {
+// catBox draws the window, and returns it with its column on screen.
+func (m model) catBox() (box string, x int) {
 	lines := m.catItems()
 	cur := m.catID()
 	search := faint.Render("type to filter…")
@@ -148,29 +152,21 @@ func (m model) catBox() (box string, x, y int) {
 	body = append(body, "", hints("↑↓", "move", "space", "add or remove", "esc", "close"))
 	w := min(84, m.width()-2)
 	box = titledBox(fmt.Sprintf("Widgets · %d of %d in the list", n, len(widgets)), strings.Join(body, "\n"), w)
-	return box, (m.width() - w) / 2, 1
+	return box, (m.width() - w) / 2
 }
 
-// catAt: the widget on screen line y of the window, "" if none.
-func (m model) catAt(y int) string {
-	_, _, top := m.catBox()
-	lines := m.catItems()
-	i := y - top - 3 + m.catScroll // border, search line, blank line
-	if y-top-3 < 0 || y-top-3 >= m.catRoom() || i >= len(lines) {
-		return ""
+// catAt: the index of the list line on screen line y, -1 if none (n lines listed).
+func (m model) catAt(y, n int) int {
+	i := y - catTop - 3 // border, search line, blank line
+	if i < 0 || i >= m.catRoom() || i+m.catScroll >= n {
+		return -1
 	}
-	return lines[i].id
+	return i + m.catScroll
 }
 
 // catMove moves the selection by d widgets and keeps it in view.
 func (m *model) catMove(d int) {
-	lines := m.catItems()
-	var at []int // line index of each widget
-	for i, l := range lines {
-		if l.id != "" {
-			at = append(at, i)
-		}
-	}
+	at := catWidgets(m.catItems())
 	if len(at) == 0 {
 		m.catSel, m.catScroll = 0, 0
 		return
@@ -186,8 +182,9 @@ func (m *model) catMove(d int) {
 
 // catID: the selected widget, "" if the filter matches nothing.
 func (m model) catID() string {
-	if ids := m.selectable(); m.catSel < len(ids) {
-		return ids[m.catSel]
+	lines := m.catItems()
+	if at := catWidgets(lines); m.catSel < len(at) {
+		return lines[at[m.catSel]].id
 	}
 	return ""
 }
@@ -231,26 +228,16 @@ func (m model) catMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	case msg.Button == tea.MouseButtonWheelDown && msg.Action == tea.MouseActionPress:
 		m.catMove(3)
 	case msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress:
-		box, x, y := m.catBox()
-		if msg.X < x || msg.X >= x+lipgloss.Width(box) || msg.Y < y || msg.Y >= y+lipgloss.Height(box) {
+		box, x := m.catBox()
+		if msg.X < x || msg.X >= x+lipgloss.Width(box) || msg.Y < catTop || msg.Y >= catTop+lipgloss.Height(box) {
 			m.cat = false // click outside the window
 			return m, nil
 		}
-		if id := m.catAt(msg.Y); id != "" {
-			m.catSel = slices.Index(m.selectable(), id)
-			return m, m.toggleWidget(id)
+		lines := m.catItems()
+		if i := m.catAt(msg.Y, len(lines)); i >= 0 && lines[i].id != "" {
+			m.catSel = slices.Index(catWidgets(lines), i)
+			return m, m.toggleWidget(lines[i].id)
 		}
 	}
 	return m, nil
-}
-
-// selectable: the ids of the widgets listed, in order.
-func (m model) selectable() []string {
-	var ids []string
-	for _, l := range m.catItems() {
-		if l.id != "" {
-			ids = append(ids, l.id)
-		}
-	}
-	return ids
 }
