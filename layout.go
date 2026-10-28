@@ -12,16 +12,6 @@ import (
 	zone "github.com/lrstanley/bubblezone"
 )
 
-var widgetGroups = []struct {
-	Name string
-	IDs  []string
-}{
-	{"Session", []string{"model", "dir", "git", "userhost"}},
-	{"Gauges", []string{"context", "limit5h", "limit7d"}},
-	{"Activity", []string{"cost", "lines", "reset5h", "reset7d", "text"}},
-	{"Layout", []string{"spacer"}},
-}
-
 // optIDs: all clickable choices in the sections (fixed zones).
 func optIDs() []string {
 	ids := []string{"opt:align:", "opt:align:center", "opt:align:right", "opt:mode:", "opt:mode:left", "opt:width:1", "opt:width:2", "opt:width:4",
@@ -180,20 +170,27 @@ func (m model) widgetsView() string {
 	}
 	head = m.titled(head) + "\n" + faint.Render("Drag a widget onto the grid, or drag a cell back here to remove it.")
 	var groups []string
-	for _, g := range widgetGroups {
+	for _, g := range groupNames() {
 		var chips []string
-		for i, id := range g.IDs {
-			if i > 0 {
+		for _, w := range widgets {
+			if w.Group != g || !m.inPalette(w) {
+				continue
+			}
+			if len(chips) > 0 {
 				chips = append(chips, " ")
 			}
+			id := w.ID
 			edge := edgeColor
 			if m.drag == nil && m.hover == "pal:"+id || m.drag != nil && m.drag.from == nil && m.drag.cell.Widget == id {
 				edge = accent // hovered, or being dragged
 			}
 			chips = append(chips, zone.Mark("pal:"+id, lipgloss.NewStyle().Border(dashedBorder).BorderForeground(edge).Padding(0, 1).Render(label(id))))
 		}
+		if len(chips) == 0 {
+			continue
+		}
 		// Group name on the middle line of the buttons, in a narrow column of its own.
-		groups = append(groups, lipgloss.JoinHorizontal(lipgloss.Center, groupStyle.Render(g.Name), lipgloss.JoinHorizontal(lipgloss.Top, chips...)))
+		groups = append(groups, lipgloss.JoinHorizontal(lipgloss.Center, groupStyle.Render(g), lipgloss.JoinHorizontal(lipgloss.Top, chips...)))
 	}
 	// Pack the groups: each one goes on the first line with room left (first fit), so
 	// small groups share a line instead of taking one each.
@@ -218,7 +215,9 @@ func (m model) widgetsView() string {
 		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, l...))
 	}
 	// No gap between lines: button borders already separate them.
-	return zone.Mark("palette", head+"\n\n"+strings.Join(rows, "\n"))
+	more := zone.Mark("btn:catalogue", toggleStyle(m.hover == "btn:catalogue").Render("+ More widgets")) +
+		faint.Render(fmt.Sprintf("  %d available · +", len(widgets)))
+	return zone.Mark("palette", head+"\n\n"+strings.Join(rows, "\n")) + "\n\n" + more
 }
 
 // dashedBorder: dashed border for the widget list buttons ("draggable").

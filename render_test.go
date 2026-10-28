@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestRender(t *testing.T) {
@@ -217,5 +220,57 @@ func TestGauge(t *testing.T) {
 	want := "\x1b[2m5h\x1b[0m \x1b[38;5;1m█\x1b[0m\x1b[2m░░░\x1b[0m \x1b[38;5;1m15%\x1b[0m"
 	if got := gauge(c, &used, "5h"); got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+// Session widgets, fed with the example JSON of the Claude Code docs
+// (https://code.claude.com/docs/en/statusline#available-data).
+func TestSessionWidgets(t *testing.T) {
+	in := `{"session_name":"my-session","version":"2.1.90",
+		"workspace":{"project_dir":"/original/project","added_dirs":["/a","/b"],"git_worktree":"feature-xyz",
+			"repo":{"host":"github.com","owner":"anthropics","name":"claude-code"}},
+		"output_style":{"name":"default"},
+		"cost":{"total_duration_ms":45000,"total_api_duration_ms":2300},
+		"context_window":{"total_input_tokens":15500,"total_output_tokens":1200,"context_window_size":1000000},
+		"exceeds_200k_tokens":false,"prompt_cache":{"warm":true,"hit_ratio":0.91},
+		"fast_mode":false,"effort":{"level":"high"},"thinking":{"enabled":true},
+		"rate_limits":{"spend_limit":{"used_percentage":62.8,"resets_at":1740787200}},
+		"vim":{"mode":"NORMAL"},"agent":{"name":"security-reviewer"},
+		"pr":{"number":1234,"review_state":"changes_requested"}}`
+	var s session
+	if err := json.Unmarshal([]byte(in), &s); err != nil {
+		t.Fatal(err)
+	}
+	for id, want := range map[string]string{
+		"session":  "my-session",
+		"version":  "v2.1.90",
+		"project":  "project",
+		"added":    "+2 dirs",
+		"worktree": "wt feature-xyz",
+		"repo":     "anthropics/claude-code",
+		"style":    "", // default output style: hidden
+		"duration": "⏱ 45s",
+		"apitime":  "api 2s",
+		"tokens":   "in 15.5k out 1.2k",
+		"ctxsize":  "1M",
+		"over200k": "",
+		"cache":    "cache warm 91%",
+		"fast":     "",
+		"effort":   "effort high",
+		"thinking": "thinking",
+		"vim":      "NORMAL",
+		"agent":    "security-reviewer",
+		"pr":       "#1234 changes requested",
+		"spend":    "$ ██████░░░░ 63%",
+	} {
+		if got := ansi.Strip(cellValue(Cell{Widget: id}, s)); got != want {
+			t.Errorf("%s: got %q, want %q", id, got, want)
+		}
+	}
+	// Absent fields leave every widget empty.
+	for _, w := range widgets {
+		if w.Extra && cellValue(Cell{Widget: w.ID}, session{}) != "" {
+			t.Errorf("%s: not empty without data", w.ID)
+		}
 	}
 }

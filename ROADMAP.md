@@ -9,17 +9,17 @@ it is the list we pick from next. Suggestions are welcome in the issues.
 
 Claude Code already sends these fields, so they cost nothing to render.
 
-- [ ] **Model**: raw model id, reasoning effort, extended thinking on or off, fast mode.
-- [ ] **Session**: session name, short session id, session duration, time spent waiting
-      for the API, Claude Code version, output style, vim mode, agent name.
-- [ ] **Workspace**: project directory, number of added directories, repository
-      (`owner/name`), git worktree.
-- [ ] **Context**: input and output tokens, context window size (200k or 1M), cache reads
-      and writes from the last call, a warning past 200k tokens.
-- [ ] **Spend limit**: amount spent against the limit, as a gauge, with its reset time.
-- [ ] **Pull request**: number, review state, and a clickable link.
-- [ ] **Prompt cache**: warm or cold, time left before it expires, hit ratio, last
-      miss cause.
+Already in the catalogue: effort, fast mode, thinking, session name and time, API time,
+Claude Code version, output style, vim mode, agent, project, added directories,
+repository, worktree, pull request, tokens, context size, over 200k, prompt cache and the
+spend limit gauge.
+
+- [ ] **Model**: raw model id.
+- [ ] **Session**: short session id.
+- [ ] **Context**: cache reads and writes from the last call.
+- [ ] **Spend limit**: amount spent against the limit, with its reset time.
+- [ ] **Pull request**: a clickable link.
+- [ ] **Prompt cache**: time left before it expires, last miss cause.
 
 ### Derived from the session JSON
 
@@ -71,7 +71,6 @@ Claude Code already sends these fields, so they cost nothing to render.
 - [ ] Preview scenarios: context nearly full, a limit close to its end, no git, API key
       account. A slider for the preview width.
 - [ ] Undo and redo.
-- [ ] Search the widget list.
 - [ ] Hand pointer over draggable items, in terminals that support it.
 - [ ] A more compact layout overall.
 
