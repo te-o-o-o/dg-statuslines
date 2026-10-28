@@ -87,7 +87,7 @@ func spacerWidth(c Cell) int {
 
 func configPath() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".claude", "statusline-builder.json")
+	return filepath.Join(home, ".claude", "dg-statuslines.json")
 }
 
 func loadConfig() (Config, error) {

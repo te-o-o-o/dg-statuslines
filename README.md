@@ -1,4 +1,4 @@
-<h1 align="center">slb</h1>
+<h1 align="center">dg-statuslines</h1>
 
 <p align="center">
   A status line builder for Claude Code.<br>
@@ -16,7 +16,7 @@
   <a href="#license">License</a>
 </p>
 
-One binary, two commands: `slb edit` opens the builder, and `slb render` is what
+One binary, two commands: `dgsl edit` opens the builder, and `dgsl render` is what
 Claude Code runs to draw the status line. No bash script to generate, no `jq`.
 
 ## Features
@@ -52,8 +52,8 @@ irm https://raw.githubusercontent.com/te-o-o-o/dg-statuslines/main/install.ps1 |
 ```
 
 Both scripts download the binary of the latest release for your system, check it against
-the release checksums, and put it in `~/.local/bin` (`%LOCALAPPDATA%\slb` on Windows).
-Then run `slb`, build your line, and install it from the **Install** tab.
+the release checksums, and put it in `~/.local/bin` (`%LOCALAPPDATA%\dgsl` on Windows).
+Then run `dgsl`, build your line, and install it from the **Install** tab.
 
 To update, run the same command again: the binary is replaced in place, so Claude Code
 keeps running it from the same path. The binaries are not signed, so macOS or Windows may
@@ -81,7 +81,7 @@ To uninstall, delete the binary, then restore `~/.claude/settings.json.bak` or r
   page in a browser, macOS refuses to open it until you clear the flag:
 
   ```bash
-  xattr -d com.apple.quarantine ~/.local/bin/slb
+  xattr -d com.apple.quarantine ~/.local/bin/dgsl
   ```
 
 - Themes use truecolor. If colours look off in Terminal.app, try iTerm2, Ghostty, kitty
@@ -91,7 +91,7 @@ To uninstall, delete the binary, then restore `~/.claude/settings.json.bak` or r
 
 | Key | Action |
 |---|---|
-| `slb` | open the builder (`slb help` lists the commands, `slb version` prints the version) |
+| `dgsl` | open the builder (`dgsl help` lists the commands, `dgsl version` prints the version) |
 | `1` `2` `3`, `Tab` | Layout, Style and Install tabs |
 | drag | place a widget, move or swap cells, drop on the widget list to remove |
 | `←↑↓→` | select a cell |
@@ -101,7 +101,7 @@ To uninstall, delete the binary, then restore `~/.claude/settings.json.bak` or r
 | `s` | save |
 | `q` | quit |
 
-The layout is saved in `~/.claude/statusline-builder.json`. `slb render` reads it, reads the
+The layout is saved in `~/.claude/dg-statuslines.json`. `dgsl render` reads it, reads the
 session JSON Claude Code sends on stdin, and prints the lines. It never fails: bad input or
 a missing config gives an empty line, not an error.
 

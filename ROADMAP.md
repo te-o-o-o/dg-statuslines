@@ -1,6 +1,6 @@
 # Roadmap
 
-Ideas for slb that are not built yet, grouped by area. Nothing here is a promise:
+Ideas for dg-statuslines that are not built yet, grouped by area. Nothing here is a promise:
 it is the list we pick from next. Suggestions are welcome in the issues.
 
 ## Widgets
@@ -82,5 +82,5 @@ Claude Code already sends these fields, so they cost nothing to render.
 - [ ] Set Claude Code's `refreshInterval` from the Install tab.
 - [ ] A status line for subagents (`subagentStatusLine`).
 - [ ] A per-project configuration.
-- [ ] `slb doctor`: check the install, the config and the terminal.
+- [ ] `dgsl doctor`: check the install, the config and the terminal.
 - [ ] Honour `NO_COLOR`, and a plain mode for terminals with few colours.

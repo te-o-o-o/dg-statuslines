@@ -1,10 +1,10 @@
-# Builds slb for every platform and publishes the binaries on a GitHub Release.
+# Builds dgsl for every platform and publishes the binaries on a GitHub Release.
 #
-# Triggered by a tag: `git tag v0.1.0 && git push --tags`. slb is pure Go, so a
+# Triggered by a tag: `git tag v0.1.0 && git push --tags`. dgsl is pure Go, so a
 # single Linux runner cross-compiles every target. The tag is stamped into the
-# binary (`slb version`).
+# binary (`dgsl version`).
 #
-# Assets are bare binaries named `slb-<os>-<arch>[.exe]`, plus `checksums.txt`:
+# Assets are bare binaries named `dgsl-<os>-<arch>[.exe]`, plus `checksums.txt`:
 # install.sh and install.ps1 download them by these exact names from the latest
 # release. Nothing is signed, so macOS and Windows may warn on first launch.
 name: release
@@ -41,9 +41,9 @@ jobs:
             if [ "$os" = windows ]; then ext=.exe; fi
             GOOS=$os GOARCH=$arch go build -trimpath \
               -ldflags "-s -w -X main.version=$GITHUB_REF_NAME" \
-              -o "dist/slb-$os-$arch$ext" .
+              -o "dist/dgsl-$os-$arch$ext" .
           done
-          (cd dist && sha256sum slb-* > checksums.txt)
+          (cd dist && sha256sum dgsl-* > checksums.txt)
 
       - name: Publish
         env:
@@ -51,5 +51,5 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" dist/* \
             --repo "$GITHUB_REPOSITORY" \
-            --title "slb $GITHUB_REF_NAME" \
+            --title "dg-statuslines $GITHUB_REF_NAME" \
             --generate-notes
