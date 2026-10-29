@@ -16,9 +16,8 @@ import (
 )
 
 const (
-	cellWidth = 14
-	minW      = 60 // below this: "terminal too small" state
-	minH      = 20
+	minW = 60 // below this: "terminal too small" state
+	minH = 20
 )
 
 var tabNames = []string{"Layout", "Style", "Install"}
@@ -72,7 +71,6 @@ var (
 	okStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	warnStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 	errStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	box       = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
 )
 
 func edit() error {
@@ -82,15 +80,9 @@ func edit() error {
 		cfg = Config{Rows: [][]Cell{make([]Cell, 4), make([]Cell, 4)}}
 	}
 	// All rows have the same number of columns.
-	cols := 1
-	for _, r := range cfg.Rows {
-		cols = max(cols, len(r))
-	}
-	for i := range cfg.Rows {
-		for len(cfg.Rows[i]) < cols {
-			cfg.Rows[i] = append(cfg.Rows[i], Cell{})
-		}
-	}
+	rows := cfg.Rows
+	cfg.Rows = nil
+	cfg = grid("", cfg, rows...)
 	// No widget list chosen yet: the non-extra widgets.
 	if cfg.Palette == nil {
 		for _, w := range widgets {
@@ -160,48 +152,19 @@ func parseCell(id string) (pos, bool) {
 	return p, err == nil
 }
 
+// marked: the zone ids drawn since the last View. A zone's content is built before
+// the zone itself, so nested zones (pal:… inside palette) come before their container.
+var marked []string
+
+// mark is zone.Mark, remembering the id for hit.
+func mark(id, s string) string {
+	marked = append(marked, id)
+	return zone.Mark(id, s)
+}
+
 // hit returns the id of the zone under the mouse ("" if none).
 func (m model) hit(msg tea.MouseMsg) string {
-	ids := []string{"tab:0", "tab:1", "tab:2", "btn:install", "palette", "btn:catalogue"}
-	for r, row := range m.cfg.Rows {
-		ids = append(ids, fmt.Sprintf("gap:%d", r), fmt.Sprintf("free:%d", r))
-		for c := range row {
-			ids = append(ids, cellID(r, c), sepSlotID(r, c))
-		}
-	}
-	for _, w := range widgets {
-		ids = append(ids, "pal:"+w.ID)
-	}
-	for _, sec := range sectionNames {
-		ids = append(ids, "sec:"+sec)
-	}
-	ids = append(ids, optIDs()...)
-	for _, sp := range separators {
-		ids = append(ids, "sep:"+sp, "cellsep:"+sp)
-	}
-	ids = append(ids, "cellsep:")
-	for _, t := range themes {
-		ids = append(ids, "theme:"+t.ID)
-	}
-	for _, p := range presets {
-		ids = append(ids, "preset:"+p.ID)
-	}
-	ids = append(ids, "preset:random", "preset:prev", "ui:", "ui:ocean", "ui:paper")
-	for _, b := range borders {
-		ids = append(ids, "border:"+b.ID)
-	}
-	for _, c := range colors {
-		ids = append(ids, "bcolor:"+c.Name)
-	}
-	ids = append(ids, "border:", "bcolor:")
-	ids = append(ids, "btn:+row", "btn:-row", "btn:+col", "btn:-col", "btn:airrows", "btn:aircols")
-	// Nested zones (pal:… inside palette) are checked before their container.
-	for _, id := range ids[6:] {
-		if zone.Get(id).InBounds(msg) {
-			return id
-		}
-	}
-	for _, id := range ids[:6] {
+	for _, id := range marked {
 		if zone.Get(id).InBounds(msg) {
 			return id
 		}
@@ -325,12 +288,9 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	case hit == "btn:aircols":
 		m.cfg.AirCols = !m.cfg.AirCols
 	case hit == "preset:random":
-		m.roll()
-		return m, m.notify("Random · r reroll · R previous · s save", false)
+		return m, m.roll()
 	case hit == "preset:prev":
-		if m.prevRoll() {
-			return m, m.notify(fmt.Sprintf("Roll %d of %d · s save", m.rollIdx+1, len(m.rolls)), false)
-		}
+		return m, m.prevRoll()
 	case strings.HasPrefix(hit, "preset:"):
 		for _, p := range presets {
 			if "preset:"+p.ID == hit {
@@ -342,7 +302,9 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 		m.cfg.UI = strings.TrimPrefix(hit, "ui:")
 		applyUI(m.cfg.UI)
 	case strings.HasPrefix(hit, "theme:"):
-		m.applyTheme(strings.TrimPrefix(hit, "theme:"))
+		if t, ok := themeByID(strings.TrimPrefix(hit, "theme:")); ok {
+			recolor(&m.cfg, t)
+		}
 	case strings.HasPrefix(hit, "sep:"):
 		m.cfg.Sep = strings.TrimPrefix(hit, "sep:")
 	case strings.HasPrefix(hit, "border:"):
@@ -380,12 +342,6 @@ func (m *model) apply(id string) {
 	}
 	c := &m.cfg.Rows[m.sel.r][m.sel.c]
 	switch {
-	case strings.HasPrefix(id, "place:"):
-		*c = Cell{Widget: strings.TrimPrefix(id, "place:")}
-		if th, ok := themeByID(m.cfg.Theme); ok {
-			c.Color = th.color(c.Widget)
-		}
-		m.editing = c.Widget == "text"
 	case strings.HasPrefix(id, "color:"):
 		c.Color = strings.TrimPrefix(id, "color:")
 	case strings.HasPrefix(id, "opt:"):
@@ -529,12 +485,9 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "pgup":
 		m.scrollBy(-(m.bodyRoom() - 2))
 	case "r":
-		m.roll()
-		return m, m.notify("Random · r reroll · R previous · s save", false)
+		return m, m.roll()
 	case "R":
-		if m.prevRoll() {
-			return m, m.notify(fmt.Sprintf("Roll %d of %d · s save", m.rollIdx+1, len(m.rolls)), false)
-		}
+		return m, m.prevRoll()
 	case "s":
 		return m, m.save()
 	case "i":
@@ -571,7 +524,7 @@ func toggleStyle(on bool) lipgloss.Style {
 }
 
 func toggle(id, label string, on bool) string {
-	return zone.Mark(id, toggleStyle(on).Render(label))
+	return mark(id, toggleStyle(on).Render(label))
 }
 
 func (m model) gap(r int) bool { return r < len(m.cfg.Gaps) && m.cfg.Gaps[r] }
@@ -601,6 +554,14 @@ func (m model) width() int {
 	return m.w
 }
 
+// height: terminal height, 24 until the terminal reports its size.
+func (m model) height() int {
+	if m.h == 0 {
+		return 24
+	}
+	return m.h
+}
+
 // titledBox draws a gray box of width w with a title in the top edge.
 func titledBox(name, content string, w int) string {
 	edge := lipgloss.NewStyle().Foreground(edgeColor)
@@ -622,7 +583,7 @@ func (m model) header() string {
 		if i == m.tab {
 			st = lipgloss.NewStyle().Bold(true).Underline(true).Foreground(accent)
 		}
-		left += zone.Mark(fmt.Sprintf("tab:%d", i), st.Render(n)) + "   "
+		left += mark(fmt.Sprintf("tab:%d", i), st.Render(n)) + "   "
 	}
 	right := m.toast
 	if right == "" {
@@ -638,16 +599,13 @@ func (m model) header() string {
 
 func (m model) previewBox() string {
 	// Git cells become fixed text: no git subprocess on every frame.
-	pcfg := m.cfg // same global settings, rows copied below
-	pcfg.Rows = nil
-	for _, row := range m.cfg.Rows {
-		prow := append([]Cell(nil), row...)
-		for i, c := range prow {
+	pcfg := cloneConfig(m.cfg)
+	for _, row := range pcfg.Rows {
+		for i, c := range row {
 			if c.Widget == "git" {
-				prow[i].Widget, prow[i].Text = "text", m.branch // keeps color, alignment and separator
+				row[i].Widget, row[i].Text = "text", m.branch // keeps color, alignment and separator
 			}
 		}
-		pcfg.Rows = append(pcfg.Rows, prow)
 	}
 	preview := render(m.sample, pcfg)
 	if preview == "" {
@@ -704,11 +662,7 @@ func (m model) bodyLines() []string {
 
 // bodyRoom: lines available for the content, between the preview and the help.
 func (m model) bodyRoom() int {
-	h := m.h
-	if h == 0 {
-		h = 24
-	}
-	return max(3, h-3-lipgloss.Height(m.previewBox())-1)
+	return max(3, m.height()-3-lipgloss.Height(m.previewBox())-1)
 }
 
 func (m *model) scrollBy(d int) {
@@ -721,6 +675,7 @@ func (m model) View() string {
 			minW, minH, m.w, m.h, keyStyle.Render("q"))
 	}
 
+	marked = nil
 	// Fixed header and preview, scrolling content, help at the bottom.
 	top := strings.Join([]string{m.header(), "", m.previewBox(), ""}, "\n")
 	bl := m.bodyLines()

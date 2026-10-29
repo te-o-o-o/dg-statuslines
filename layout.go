@@ -9,29 +9,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
-	zone "github.com/lrstanley/bubblezone"
 )
-
-// optIDs: all clickable choices in the sections (fixed zones).
-func optIDs() []string {
-	ids := []string{"opt:align:", "opt:align:center", "opt:align:right", "opt:mode:", "opt:mode:left", "opt:width:1", "opt:width:2", "opt:width:4",
-		"opt:width:5", "opt:width:8", "opt:width:10", "opt:width:15", "opt:width:16",
-		"opt:label:on", "opt:label:off", "opt:icon:yes", "opt:icon:no",
-		"opt:version:yes", "opt:version:no", "opt:full:yes", "opt:full:no", "insp:text", "color:"}
-	for _, b := range barStyles {
-		ids = append(ids, "opt:bar:"+b.ID)
-	}
-	for _, cp := range capStyles {
-		ids = append(ids, "opt:caps:"+cp.ID)
-	}
-	for _, c := range colors {
-		ids = append(ids, "color:"+c.Name)
-	}
-	for name := range schemes {
-		ids = append(ids, "color:"+name)
-	}
-	return ids
-}
 
 func (m model) selCell() *Cell {
 	if m.sel == nil {
@@ -60,7 +38,7 @@ func (m model) layoutTab() string {
 	if m.drag == nil && m.hover == "preset:random" {
 		random = random.Background(randomHover)
 	}
-	roll := []string{zone.Mark("preset:random", random.Render("⚄ Random"))}
+	roll := []string{mark("preset:random", random.Render("⚄ Random"))}
 	if m.rollIdx > 0 {
 		roll = append(roll, toggle("preset:prev", "↶ Previous", false))
 	}
@@ -120,7 +98,7 @@ func (m model) sepSlot(r, c int) string {
 	} else if m.drag == nil && m.hover == sepSlotID(r, c) {
 		st = st.Foreground(accent)
 	}
-	return zone.Mark(sepSlotID(r, c), st.Render(" "+glyph+" "))
+	return mark(sepSlotID(r, c), st.Render(" "+glyph+" "))
 }
 
 func sepSlotID(r, c int) string { return fmt.Sprintf("sepslot:%d:%d", r, c) }
@@ -160,7 +138,7 @@ func (m model) card(r, c int) string {
 		st = st.Border(lipgloss.DoubleBorder()).BorderForeground(accent)
 		text = lipgloss.NewStyle().Foreground(accent).Bold(true).Render(ansi.Strip(text))
 	}
-	return zone.Mark(cellID(r, c), st.Render(text))
+	return mark(cellID(r, c), st.Render(text))
 }
 
 func (m model) widgetsView() string {
@@ -184,7 +162,7 @@ func (m model) widgetsView() string {
 			if m.drag == nil && m.hover == "pal:"+id || m.drag != nil && m.drag.from == nil && m.drag.cell.Widget == id {
 				edge = accent // hovered, or being dragged
 			}
-			chips = append(chips, zone.Mark("pal:"+id, lipgloss.NewStyle().Border(dashedBorder).BorderForeground(edge).Padding(0, 1).Render(label(id))))
+			chips = append(chips, mark("pal:"+id, lipgloss.NewStyle().Border(dashedBorder).BorderForeground(edge).Padding(0, 1).Render(label(id))))
 		}
 		if len(chips) == 0 {
 			continue
@@ -215,9 +193,9 @@ func (m model) widgetsView() string {
 		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, l...))
 	}
 	// No gap between lines: button borders already separate them.
-	more := zone.Mark("btn:catalogue", toggleStyle(m.hover == "btn:catalogue").Render("+ More widgets")) +
+	more := mark("btn:catalogue", toggleStyle(m.hover == "btn:catalogue").Render("+ More widgets")) +
 		faint.Render(fmt.Sprintf("  %d available · +", len(widgets)))
-	return zone.Mark("palette", head+"\n\n"+strings.Join(rows, "\n")) + "\n\n" + more
+	return mark("palette", head+"\n\n"+strings.Join(rows, "\n")) + "\n\n" + more
 }
 
 // dashedBorder: dashed border for the widget list buttons ("draggable").
@@ -227,9 +205,6 @@ var dashedBorder = lipgloss.Border{
 }
 
 // sections: the settings sections for the cell's widget.
-// sectionNames lists every settings section; sections() picks those a widget has.
-var sectionNames = []string{"Color", "Bar", "Display", "Format", "Text", "Width", "Align"}
-
 func sections(c *Cell) []string {
 	switch {
 	case isGauge(c.Widget):
@@ -282,11 +257,7 @@ func (m model) settingsView() string {
 		var o []opt
 		o = append(o, opt{"cellsep:", "inherit " + inherited, cur == ""})
 		for _, sp := range separators {
-			name := sp
-			if sp == "space" {
-				name = "space"
-			}
-			o = append(o, opt{"cellsep:" + sp, name, cur == sp})
+			o = append(o, opt{"cellsep:" + sp, sp, cur == sp})
 		}
 		return m.titled(heading.Render("SEPARATOR")+faint.Render(fmt.Sprintf("  row %d · after column %d", p.r+1, p.c+1))) + "\n\n" +
 			chips(o...) + "\n\n" + faint.Render("inherit follows the separator chosen in the Style tab.")
@@ -307,7 +278,7 @@ func (m model) settingsView() string {
 		if s == cur {
 			st = lipgloss.NewStyle().Bold(true).Underline(true).Foreground(accent)
 		}
-		tabs = append(tabs, zone.Mark("sec:"+s, st.Render(s)))
+		tabs = append(tabs, mark("sec:"+s, st.Render(s)))
 	}
 
 	var body []string

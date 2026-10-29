@@ -2,7 +2,12 @@ package main
 
 // Random layouts: chance within rules, so every roll stays readable.
 
-import "math/rand/v2"
+import (
+	"fmt"
+	"math/rand/v2"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
 
 // randomConfig draws a theme, 1 to 3 rows of 3 to 5 distinct widgets, gauges grouped
 // on one row with a shared bar style, a sober separator and sometimes a border.
@@ -120,14 +125,14 @@ func cloneConfig(c Config) Config {
 	return c
 }
 
-// roll draws a new layout and appends it to the history (dropping any rolls after the current one).
 // replace swaps in a new layout, keeping the builder settings it doesn't carry.
 func (m *model) replace(c Config) {
 	c.UI, c.Palette = m.cfg.UI, m.cfg.Palette
 	m.cfg, m.sel, m.selSep = c, nil, nil
 }
 
-func (m *model) roll() {
+// roll draws a new layout and appends it to the history (dropping any rolls after the current one).
+func (m *model) roll() tea.Cmd {
 	if m.rng == nil {
 		m.rng = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
 	}
@@ -135,14 +140,15 @@ func (m *model) roll() {
 	m.rolls = append(m.rolls[:m.rollIdx+min(1, len(m.rolls))], c)
 	m.rollIdx = len(m.rolls) - 1
 	m.replace(cloneConfig(c))
+	return m.notify("Random · r reroll · R previous · s save", false)
 }
 
 // prevRoll goes back to the previous roll, if any.
-func (m *model) prevRoll() bool {
+func (m *model) prevRoll() tea.Cmd {
 	if m.rollIdx == 0 || len(m.rolls) == 0 {
-		return false
+		return nil
 	}
 	m.rollIdx--
 	m.replace(cloneConfig(m.rolls[m.rollIdx]))
-	return true
+	return m.notify(fmt.Sprintf("Roll %d of %d · s save", m.rollIdx+1, len(m.rolls)), false)
 }
