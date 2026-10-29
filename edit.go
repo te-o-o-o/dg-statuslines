@@ -60,9 +60,7 @@ type model struct {
 	catScroll int
 
 	// Install tab, recomputed each time the tab opens.
-	plan           []byte
-	oldCmd, newCmd string
-	planErr        error
+	profiles []profile
 }
 
 var (
@@ -225,7 +223,10 @@ func (m *model) notify(msg string, err bool) tea.Cmd {
 func (m *model) setTab(t int) {
 	m.tab, m.editing, m.scroll = t, false, 0
 	if t == 2 {
-		m.plan, m.oldCmd, m.newCmd, m.planErr = planInstall()
+		m.profiles = nil
+		for _, d := range profileDirs() {
+			m.profiles = append(m.profiles, planInstall(d))
+		}
 	}
 }
 
@@ -265,8 +266,9 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	case strings.HasPrefix(hit, "tab:"):
 		t, _ := strconv.Atoi(strings.TrimPrefix(hit, "tab:"))
 		m.setTab(t)
-	case hit == "btn:install":
-		return m, m.install()
+	case strings.HasPrefix(hit, "btn:install:"):
+		i, _ := strconv.Atoi(strings.TrimPrefix(hit, "btn:install:"))
+		return m, m.install(i)
 	case hit == "btn:catalogue":
 		m.cat = true
 	case strings.HasPrefix(hit, "pal:"):
@@ -494,7 +496,7 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.setTab(2)
 	case "enter":
 		if m.tab == 2 {
-			return m, m.install()
+			return m, m.install(m.currentProfile())
 		}
 	}
 	return m, nil
@@ -634,7 +636,7 @@ func (m model) footer() string {
 	case m.tab == 1:
 		return hints("click", "choose", "1-3", "tab", "s", "save", "q", "quit")
 	}
-	return hints("enter", "save and install", "1-3", "tab", "q", "quit")
+	return hints("enter", "install in this terminal's profile", "1-3", "tab", "q", "quit")
 }
 
 // labelW: width of the label column, shared by all settings.

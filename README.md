@@ -36,8 +36,10 @@ Claude Code runs to draw the status line. No bash script to generate, no `jq`.
   spaced columns, 24 colours plus truecolor themes.
 - **7 presets** to start from, and a **random** layout with a history to step back.
 - **Live preview** pinned at the top of the builder.
-- **Safe install**: only the `statusLine` key of `~/.claude/settings.json` changes, after a
-  backup to `settings.json.bak`.
+- **Every profile**: the Install tab finds each Claude Code config directory (`~/.claude`
+  and any `CLAUDE_CONFIG_DIR`, whatever its name) and installs the line in the ones you pick.
+- **Safe install**: only the `statusLine` key of the profile's `settings.json` changes, after
+  a backup to `settings.json.bak`.
 
 ## Install
 
@@ -68,8 +70,9 @@ git clone https://github.com/te-o-o-o/dg-statuslines && cd dg-statuslines
 go install .
 ```
 
-To uninstall, delete the binary, then restore `~/.claude/settings.json.bak` or remove the
-`statusLine` key from `~/.claude/settings.json`.
+To uninstall, delete the binary, then in each profile (`~/.claude` or your
+`CLAUDE_CONFIG_DIR`) restore `settings.json.bak` or remove the `statusLine` key from
+`settings.json`.
 
 ### macOS
 
