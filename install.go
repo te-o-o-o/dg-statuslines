@@ -4,16 +4,52 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 )
 
-func settingsPath() string {
+// profile: a Claude Code config directory and the change dgsl would make to its settings.json.
+type profile struct {
+	dir            string
+	plan           []byte
+	oldCmd, newCmd string
+	err            error
+}
+
+// claudeDir: the config directory of the Claude Code profile dgsl runs under.
+func claudeDir() string {
+	if d := os.Getenv("CLAUDE_CONFIG_DIR"); d != "" {
+		return filepath.Clean(d)
+	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".claude", "settings.json")
+	return filepath.Join(home, ".claude")
+}
+
+// profileDirs finds every Claude Code config directory, whatever its name: the default
+// ~/.claude, the current one, and any directory up to two levels under home holding a
+// .claude.json (Claude Code writes one at the root of each CLAUDE_CONFIG_DIR).
+func profileDirs() []string {
+	home, _ := os.UserHomeDir()
+	dirs := []string{filepath.Join(home, ".claude"), claudeDir()}
+	for _, pat := range []string{"*/.claude.json", "*/*/.claude.json"} {
+		found, _ := filepath.Glob(filepath.Join(home, pat))
+		for _, f := range found {
+			dirs = append(dirs, filepath.Dir(f))
+		}
+	}
+	var out []string
+	for _, d := range dirs {
+		if st, err := os.Stat(d); err == nil && st.IsDir() && !slices.Contains(out, d) {
+			out = append(out, d)
+		}
+	}
+	return out
 }
 
 type kv struct {
@@ -51,15 +87,17 @@ func indent(v []byte) string {
 	return buf.String()
 }
 
-// planInstall computes the new settings.json and returns the old and new
-// status line commands. Only statusLine changes; other keys are copied as is.
-func planInstall() (newContent []byte, oldCmd, newCmd string, err error) {
+// planInstall computes the new settings.json of the profile in dir, with its old and
+// new status line commands. Only statusLine changes; other keys are copied as is.
+func planInstall(dir string) (p profile) {
+	p.dir = dir
 	exe, err := os.Executable()
-	if err != nil {
-		return nil, "", "", err
+	if err == nil {
+		exe, err = filepath.EvalSymlinks(exe)
 	}
-	if exe, err = filepath.EvalSymlinks(exe); err != nil {
-		return nil, "", "", err
+	if err != nil {
+		p.err = err
+		return p
 	}
 	// Forward slashes, as Claude Code's docs ask on Windows; quotes when the path
 	// has spaces, since the command goes through a shell.
@@ -67,30 +105,32 @@ func planInstall() (newContent []byte, oldCmd, newCmd string, err error) {
 	if strings.ContainsRune(exe, ' ') {
 		exe = `"` + exe + `"`
 	}
-	newCmd = exe + " render"
+	p.newCmd = exe + " render"
 	line, _ := json.Marshal(struct {
 		Type    string `json:"type"`
 		Command string `json:"command"`
-	}{"command", newCmd})
+	}{"command", p.newCmd})
 
-	old, err := os.ReadFile(settingsPath())
+	old, err := os.ReadFile(filepath.Join(dir, "settings.json"))
 	if err != nil && !os.IsNotExist(err) {
-		return nil, "", "", err
+		p.err = err
+		return p
 	}
 	var pairs []kv
 	if len(bytes.TrimSpace(old)) > 0 {
 		if pairs, err = parseObject(old); err != nil {
-			return nil, "", "", err
+			p.err = err
+			return p
 		}
 	}
 
-	oldCmd = "(none)"
+	p.oldCmd = "(none)"
 	found := false
-	for i, p := range pairs {
-		if p.Key == "statusLine" {
+	for i, e := range pairs {
+		if e.Key == "statusLine" {
 			var sl struct{ Command string }
-			if json.Unmarshal(p.Value, &sl) == nil && sl.Command != "" {
-				oldCmd = sl.Command
+			if json.Unmarshal(e.Value, &sl) == nil && sl.Command != "" {
+				p.oldCmd = sl.Command
 			}
 			pairs[i].Value = line
 			found = true
@@ -102,78 +142,98 @@ func planInstall() (newContent []byte, oldCmd, newCmd string, err error) {
 
 	var buf bytes.Buffer
 	buf.WriteByte('{')
-	for i, p := range pairs {
+	for i, e := range pairs {
 		if i > 0 {
 			buf.WriteByte(',')
 		}
-		k, _ := json.Marshal(p.Key)
+		k, _ := json.Marshal(e.Key)
 		buf.Write(k)
 		buf.WriteByte(':')
-		buf.Write(p.Value)
+		buf.Write(e.Value)
 	}
 	buf.WriteByte('}')
-	newContent = []byte(indent(buf.Bytes()) + "\n")
-
-	return newContent, oldCmd, newCmd, nil
+	p.plan = []byte(indent(buf.Bytes()) + "\n")
+	return p
 }
 
-func applyInstall(newContent []byte) error {
-	p := settingsPath()
+func applyInstall(dir string, newContent []byte) error {
+	p := filepath.Join(dir, "settings.json")
 	if old, err := os.ReadFile(p); err == nil {
 		if err := os.WriteFile(p+".bak", old, 0o644); err != nil {
 			return err
 		}
-	} else if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+	} else if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 	return os.WriteFile(p, newContent, 0o644)
 }
 
-func (m *model) install() tea.Cmd {
-	if m.planErr != nil {
-		return m.notify("settings.json unreadable: "+m.planErr.Error(), true)
+// install saves the config and makes dgsl the status line of profile i.
+func (m *model) install(i int) tea.Cmd {
+	if i < 0 || i >= len(m.profiles) {
+		return nil
+	}
+	p := m.profiles[i]
+	if p.err != nil {
+		return m.notify(tilde(p.dir)+"/settings.json unreadable: "+p.err.Error(), true)
 	}
 	if cmd := m.save(); m.dirty() {
 		return cmd // saving the config failed
 	}
-	if err := applyInstall(m.plan); err != nil {
+	if err := applyInstall(p.dir, p.plan); err != nil {
 		return m.notify("Cannot install: "+err.Error(), true)
 	}
-	m.setTab(2) // re-read settings.json to refresh the status
-	return m.notify("Installed in Claude Code", false)
+	m.setTab(2) // re-read the settings to refresh the status
+	return m.notify("Installed in "+tilde(p.dir), false)
+}
+
+// currentProfile: the index of the profile dgsl runs under, -1 if not found.
+func (m model) currentProfile() int {
+	return slices.IndexFunc(m.profiles, func(p profile) bool { return p.dir == claudeDir() })
 }
 
 func (m model) installTab() string {
-	if m.planErr != nil {
-		return m.titled(heading.Render("INSTALLATION")) + "\n\n" +
-			errStyle.Render("✗ ") + "Cannot read ~/.claude/settings.json: " + m.planErr.Error() + "\n" +
-			faint.Render("Fix the file, then reopen this tab.")
-	}
-	status := warnStyle.Render("○ ") + "dgsl is not yet the Claude Code status line"
-	if m.oldCmd == m.newCmd {
-		status = okStyle.Render("✓ ") + "dgsl is the Claude Code status line"
-	}
 	cfgState := faint.Render("  ✓ saved")
 	if m.dirty() {
 		cfgState = warnStyle.Render("  ● unsaved")
 	}
 	lines := []string{
 		m.titled(heading.Render("INSTALLATION")), "",
-		faint.Render("Status      ") + status,
-		faint.Render("Config      ") + "~/.claude/dg-statuslines.json" + cfgState,
+		faint.Render("Config      ") + "~/.claude/dg-statuslines.json" + cfgState + faint.Render("  shared by every profile"),
+		"",
+		m.titled(heading.Render("PROFILES") + faint.Render(fmt.Sprintf("  %d found", len(m.profiles)))),
+		faint.Render("Every Claude Code config directory: ~/.claude and each CLAUDE_CONFIG_DIR."),
 		"",
 	}
-	if m.oldCmd != m.newCmd {
-		lines = append(lines,
-			faint.Render("Planned change in ~/.claude/settings.json"),
-			"  "+errStyle.Render("- "+m.oldCmd),
-			"  "+okStyle.Render("+ "+m.newCmd),
-			"",
-		)
+	dirW := 0
+	for _, p := range m.profiles {
+		dirW = max(dirW, len(tilde(p.dir)))
+	}
+	cur := m.currentProfile()
+	for i, p := range m.profiles {
+		name := fmt.Sprintf("%-*s", dirW, tilde(p.dir))
+		if i == cur {
+			name += faint.Render("  this terminal")
+		} else {
+			name += "               "
+		}
+		var line string
+		switch {
+		case p.err != nil:
+			line = errStyle.Render("✗ ") + name + "  " + errStyle.Render("settings.json unreadable: "+p.err.Error())
+		case p.oldCmd == p.newCmd:
+			line = okStyle.Render("✓ ") + name + "  " + faint.Render("dgsl is the status line")
+		default:
+			btn := mark(fmt.Sprintf("btn:install:%d", i), button.Background(accent).Foreground(onAccent).Bold(true).Render("Install"))
+			now := ansi.Truncate(p.oldCmd, max(10, m.width()-dirW-40), "…")
+			line = warnStyle.Render("○ ") + name + "  " + btn + "  " + faint.Render("now: "+now)
+		}
+		lines = append(lines, line)
+	}
+	if len(m.profiles) > 0 {
+		lines = append(lines, "", faint.Render("Installs: "+m.profiles[0].newCmd))
 	}
 	lines = append(lines,
-		mark("btn:install", button.Background(accent).Foreground(onAccent).Bold(true).Render("Save and install")),
-		"",
 		faint.Render("A copy of settings.json is kept in settings.json.bak before each change."),
 	)
 	return strings.Join(lines, "\n")

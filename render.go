@@ -115,6 +115,14 @@ func spacerWidth(c Cell) int {
 	return c.Width
 }
 
+// tilde shortens a path under the home directory to ~/….
+func tilde(d string) string {
+	if home, _ := os.UserHomeDir(); home != "" && (d == home || strings.HasPrefix(d, home+"/")) {
+		return "~" + strings.TrimPrefix(d, home)
+	}
+	return d
+}
+
 func configPath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".claude", "dg-statuslines.json")
@@ -439,10 +447,7 @@ func cellValue(c Cell, s session) string {
 		if !c.Full {
 			return paint(filepath.Base(d), col)
 		}
-		if home, _ := os.UserHomeDir(); home != "" && (d == home || strings.HasPrefix(d, home+"/")) {
-			d = "~" + strings.TrimPrefix(d, home)
-		}
-		return paint(d, col)
+		return paint(tilde(d), col)
 	case "git":
 		return paint(gitBranch(s.dir()), col)
 	case "userhost":
