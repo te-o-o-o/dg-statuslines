@@ -53,9 +53,9 @@ var presets = []preset{
 	}},
 }
 
-// grid builds a preset: rows padded to the same width, theme colors applied.
+// grid builds a preset: rows padded to the same width (at least 1), theme colors applied.
 func grid(themeID string, cfg Config, rows ...[]Cell) Config {
-	n := 0
+	n := 1
 	for _, r := range rows {
 		n = max(n, len(r))
 	}

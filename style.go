@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	zone "github.com/lrstanley/bubblezone"
 )
 
 func themeByID(id string) (theme, bool) {
@@ -18,15 +17,6 @@ func themeByID(id string) (theme, bool) {
 		}
 	}
 	return theme{}, false
-}
-
-// applyTheme recolors all cells and the border (overrides hand-picked colors).
-func (m *model) applyTheme(id string) {
-	t, ok := themeByID(id)
-	if !ok {
-		return
-	}
-	recolor(&m.cfg, t)
 }
 
 // swatch: one square of the color grid.
@@ -56,14 +46,14 @@ func swatchGrid(prefix, cur string, items []swatch, perRow int) string {
 		switch {
 		case len(it.Colors) == 0:
 			cell = toggleStyle(it.ID == cur).Render(it.Label)
-			chips = append(chips, zone.Mark(prefix+it.ID, cell))
+			chips = append(chips, mark(prefix+it.ID, cell))
 			continue
 		case it.ID == cur:
 			cell = swatchCell(it, "✓")
 		default:
 			cell = swatchCell(it, "")
 		}
-		squares = append(squares, zone.Mark(prefix+it.ID, cell))
+		squares = append(squares, mark(prefix+it.ID, cell))
 	}
 	var rows []string
 	for i := 0; i < len(squares); i += perRow {
@@ -134,11 +124,7 @@ func (m model) styleTab() string {
 
 	var seps []string
 	for _, sp := range separators {
-		label := sp
-		if sp == "space" {
-			label = "space"
-		}
-		seps = append(seps, toggle("sep:"+sp, label, m.cfg.Sep == sp || m.cfg.Sep == "" && sp == "│"))
+		seps = append(seps, toggle("sep:"+sp, sp, m.cfg.Sep == sp || m.cfg.Sep == "" && sp == "│"))
 	}
 
 	borderChips := []string{toggle("border:", "none", m.cfg.Border == "")}

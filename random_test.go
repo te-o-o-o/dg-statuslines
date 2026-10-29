@@ -42,10 +42,10 @@ func TestRollHistory(t *testing.T) {
 	first := configJSON(m.cfg)
 	m.roll()
 	m.cfg.Rows[0][0].Color = "red" // editing the current layout must not touch the history
-	if !m.prevRoll() || configJSON(m.cfg) != first {
+	if m.prevRoll() == nil || configJSON(m.cfg) != first {
 		t.Fatal("previous roll not restored")
 	}
-	if m.prevRoll() {
+	if m.prevRoll() != nil {
 		t.Fatal("no roll before the first one")
 	}
 	m.roll() // rolling after stepping back drops the later rolls

@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	zone "github.com/lrstanley/bubblezone"
 )
 
 func settingsPath() string {
@@ -173,7 +172,7 @@ func (m model) installTab() string {
 		)
 	}
 	lines = append(lines,
-		zone.Mark("btn:install", button.Background(accent).Foreground(onAccent).Bold(true).Render("Save and install")),
+		mark("btn:install", button.Background(accent).Foreground(onAccent).Bold(true).Render("Save and install")),
 		"",
 		faint.Render("A copy of settings.json is kept in settings.json.bak before each change."),
 	)

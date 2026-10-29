@@ -110,11 +110,7 @@ func (m model) catItems() []catLine {
 
 // catRoom: list lines shown at once in the window.
 func (m model) catRoom() int {
-	h := m.h
-	if h == 0 {
-		h = 24
-	}
-	return max(3, h-10)
+	return max(3, m.height()-10)
 }
 
 // catBox draws the window, and returns it with its column on screen.
