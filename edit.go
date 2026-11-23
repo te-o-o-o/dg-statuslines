@@ -269,6 +269,9 @@ func (m model) press(hit string) (tea.Model, tea.Cmd) {
 	case strings.HasPrefix(hit, "btn:install:"):
 		i, _ := strconv.Atoi(strings.TrimPrefix(hit, "btn:install:"))
 		return m, m.install(i)
+	case strings.HasPrefix(hit, "btn:uninstall:"):
+		i, _ := strconv.Atoi(strings.TrimPrefix(hit, "btn:uninstall:"))
+		return m, m.uninstall(i)
 	case hit == "btn:catalogue":
 		m.cat = true
 	case strings.HasPrefix(hit, "pal:"):

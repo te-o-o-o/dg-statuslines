@@ -17,7 +17,7 @@ import (
 // profile: a Claude Code config directory and the change dgsl would make to its settings.json.
 type profile struct {
 	dir            string
-	plan           []byte
+	plan, undo     []byte // settings.json with dgsl as the status line, and without it
 	oldCmd, newCmd string
 	err            error
 }
@@ -124,36 +124,59 @@ func planInstall(dir string) (p profile) {
 		}
 	}
 
-	p.oldCmd = "(none)"
-	found := false
-	for i, e := range pairs {
-		if e.Key == "statusLine" {
-			var sl struct{ Command string }
-			if json.Unmarshal(e.Value, &sl) == nil && sl.Command != "" {
-				p.oldCmd = sl.Command
+	p.oldCmd = statusCmd(pairs)
+	p.plan = withKey(pairs, "statusLine", line)
+	// Removing dgsl puts back the status line the .bak holds, if it is not dgsl itself.
+	var prev json.RawMessage
+	if bak, err := os.ReadFile(filepath.Join(dir, "settings.json.bak")); err == nil {
+		if bp, err := parseObject(bak); err == nil {
+			if c := statusCmd(bp); c != "(none)" && c != p.newCmd {
+				prev = bp[slices.IndexFunc(bp, func(e kv) bool { return e.Key == "statusLine" })].Value
 			}
-			pairs[i].Value = line
-			found = true
 		}
 	}
-	if !found {
-		pairs = append(pairs, kv{"statusLine", line})
-	}
+	p.undo = withKey(pairs, "statusLine", prev)
+	return p
+}
 
+// statusCmd: the status line command in settings, "(none)" if there is none.
+func statusCmd(pairs []kv) string {
+	for _, e := range pairs {
+		var sl struct{ Command string }
+		if e.Key == "statusLine" && json.Unmarshal(e.Value, &sl) == nil && sl.Command != "" {
+			return sl.Command
+		}
+	}
+	return "(none)"
+}
+
+// withKey encodes pairs with key set to v (appended if missing), or removed if v is nil.
+func withKey(pairs []kv, key string, v json.RawMessage) []byte {
 	var buf bytes.Buffer
 	buf.WriteByte('{')
-	for i, e := range pairs {
-		if i > 0 {
+	found := false
+	write := func(k string, v json.RawMessage) {
+		if buf.Len() > 1 {
 			buf.WriteByte(',')
 		}
-		k, _ := json.Marshal(e.Key)
-		buf.Write(k)
+		kb, _ := json.Marshal(k)
+		buf.Write(kb)
 		buf.WriteByte(':')
-		buf.Write(e.Value)
+		buf.Write(v)
+	}
+	for _, e := range pairs {
+		if e.Key != key {
+			write(e.Key, e.Value)
+		} else if !found && v != nil {
+			write(key, v)
+		}
+		found = found || e.Key == key
+	}
+	if !found && v != nil {
+		write(key, v)
 	}
 	buf.WriteByte('}')
-	p.plan = []byte(indent(buf.Bytes()) + "\n")
-	return p
+	return []byte(indent(buf.Bytes()) + "\n")
 }
 
 func applyInstall(dir string, newContent []byte) error {
@@ -185,6 +208,18 @@ func (m *model) install(i int) tea.Cmd {
 	}
 	m.setTab(2) // re-read the settings to refresh the status
 	return m.notify("Installed in "+tilde(p.dir), false)
+}
+
+// uninstall removes dgsl from profile i, putting back its previous status line if known.
+func (m *model) uninstall(i int) tea.Cmd {
+	if i < 0 || i >= len(m.profiles) {
+		return nil
+	}
+	if err := applyInstall(m.profiles[i].dir, m.profiles[i].undo); err != nil {
+		return m.notify("Cannot remove: "+err.Error(), true)
+	}
+	m.setTab(2)
+	return m.notify("Removed from "+tilde(m.profiles[i].dir), false)
 }
 
 // currentProfile: the index of the profile dgsl runs under, -1 if not found.
@@ -222,7 +257,8 @@ func (m model) installTab() string {
 		case p.err != nil:
 			line = errStyle.Render("✗ ") + name + "  " + errStyle.Render("settings.json unreadable: "+p.err.Error())
 		case p.oldCmd == p.newCmd:
-			line = okStyle.Render("✓ ") + name + "  " + faint.Render("dgsl is the status line")
+			btn := mark(fmt.Sprintf("btn:uninstall:%d", i), button.Render("Remove"))
+			line = okStyle.Render("✓ ") + name + "  " + btn + "  " + faint.Render("dgsl is the status line")
 		default:
 			btn := mark(fmt.Sprintf("btn:install:%d", i), button.Background(accent).Foreground(onAccent).Bold(true).Render("Install"))
 			now := ansi.Truncate(p.oldCmd, max(10, m.width()-dirW-40), "…")
