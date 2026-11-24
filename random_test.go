@@ -53,3 +53,13 @@ func TestRollHistory(t *testing.T) {
 		t.Fatalf("history %d at %d", len(m.rolls), m.rollIdx)
 	}
 }
+
+// Editing the current layout must never change a roll kept in the history.
+func TestCloneConfigIsDeep(t *testing.T) {
+	orig := Config{Rows: [][]Cell{{{Widget: "dir"}}}, Gaps: []bool{false}, Free: []bool{false}}
+	c := cloneConfig(orig)
+	c.Rows[0][0].Widget, c.Gaps[0], c.Free[0] = "git", true, true
+	if orig.Rows[0][0].Widget != "dir" || orig.Gaps[0] || orig.Free[0] {
+		t.Fatalf("clone shares memory with the original: %+v", orig)
+	}
+}

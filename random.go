@@ -122,6 +122,7 @@ func cloneConfig(c Config) Config {
 	}
 	c.Rows = rows
 	c.Gaps = append([]bool(nil), c.Gaps...)
+	c.Free = append([]bool(nil), c.Free...)
 	return c
 }
 
