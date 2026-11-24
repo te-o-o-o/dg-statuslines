@@ -3,10 +3,10 @@ module dgsl
 go 1.27.0
 
 require (
-	github.com/charmbracelet/bubbletea v1.3.10
-	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/charmbracelet/x/ansi v0.10.1
-	github.com/lrstanley/bubblezone v1.0.0
+	github.com/charmbracelet/bubbletea v1.3.10 // TUI event loop: keys, mouse, resize, alt screen
+	github.com/charmbracelet/lipgloss v1.1.0 // builder layout and styles (the render path writes raw ANSI)
+	github.com/charmbracelet/x/ansi v0.10.1 // display width and truncation of strings holding ANSI codes
+	github.com/lrstanley/bubblezone v1.0.0 // mouse hit-testing: which drawn zone a click lands in
 )
 
 require (
