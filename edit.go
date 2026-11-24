@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -408,6 +409,8 @@ func (m *model) drop(hit string) {
 	}
 }
 
+var arrows = map[string]pos{"up": {-1, 0}, "down": {1, 0}, "left": {0, -1}, "right": {0, 1}}
+
 func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.Type == tea.KeyCtrlC {
 		return m, tea.Quit
@@ -430,19 +433,11 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.tab == 0 {
+		if d, ok := arrows[msg.String()]; ok {
+			m.moveSel(d.r, d.c)
+			return m, nil
+		}
 		switch msg.String() {
-		case "up":
-			m.moveSel(-1, 0)
-			return m, nil
-		case "down":
-			m.moveSel(1, 0)
-			return m, nil
-		case "left":
-			m.moveSel(0, -1)
-			return m, nil
-		case "right":
-			m.moveSel(0, 1)
-			return m, nil
 		case "enter":
 			if c := m.selCell(); c != nil && c.Widget == "text" {
 				m.editing = true
@@ -459,12 +454,7 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "[", "]":
 			if c := m.selCell(); c != nil && c.Widget != "" {
 				secs := sections(c)
-				i := 0
-				for k, sec := range secs {
-					if sec == m.curSection() {
-						i = k
-					}
-				}
+				i := slices.Index(secs, m.curSection())
 				d := 1
 				if msg.String() == "[" {
 					d = -1
@@ -506,10 +496,8 @@ func (m model) key(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func label(id string) string {
-	for _, w := range widgets {
-		if w.ID == id {
-			return w.Label
-		}
+	if i := slices.IndexFunc(widgets, func(w widgetInfo) bool { return w.ID == id }); i >= 0 {
+		return widgets[i].Label
 	}
 	return id
 }

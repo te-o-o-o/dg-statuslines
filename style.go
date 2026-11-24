@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -11,12 +12,11 @@ import (
 )
 
 func themeByID(id string) (theme, bool) {
-	for _, t := range themes {
-		if t.ID == id {
-			return t, true
-		}
+	i := slices.IndexFunc(themes, func(t theme) bool { return t.ID == id })
+	if i < 0 {
+		return theme{}, false
 	}
-	return theme{}, false
+	return themes[i], true
 }
 
 // swatch: one square of the color grid.

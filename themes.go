@@ -94,7 +94,9 @@ func (t theme) color(widget string) string {
 // Available separators; "space" = spaces only.
 // Status line borders: top-left, top-right, bottom-left, bottom-right corners, horizontal, vertical.
 // B and R are the bottom and right edges when they differ from H and V (block frame).
-var borders = []struct{ ID, TL, TR, BL, BR, H, V, B, R string }{
+type border struct{ ID, TL, TR, BL, BR, H, V, B, R string }
+
+var borders = []border{
 	{"rounded", "╭", "╮", "╰", "╯", "─", "│", "", ""},
 	{"square", "┌", "┐", "└", "┘", "─", "│", "", ""},
 	{"double", "╔", "╗", "╚", "╝", "═", "║", "", ""},
@@ -125,7 +127,9 @@ func capsOf(c Cell) string {
 	return c.Caps
 }
 
-var barStyles = []struct{ ID, Label string }{
+type barStyle struct{ ID, Label string }
+
+var barStyles = []barStyle{
 	{"blocks", "Blocks"}, {"fine", "Fine"}, {"line", "Line"}, {"dots", "Dots"},
 	{"braille", "Braille"}, {"ascii", "ASCII"}, {"text", "Text"},
 	{"squares", "Squares"}, {"diamonds", "Diamonds"}, {"segments", "Segments"}, {"dashes", "Dashes"},

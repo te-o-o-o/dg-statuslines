@@ -212,9 +212,6 @@ func (m *model) install(i int) tea.Cmd {
 
 // uninstall removes dgsl from profile i, putting back its previous status line if known.
 func (m *model) uninstall(i int) tea.Cmd {
-	if i < 0 || i >= len(m.profiles) {
-		return nil
-	}
 	if err := applyInstall(m.profiles[i].dir, m.profiles[i].undo); err != nil {
 		return m.notify("Cannot remove: "+err.Error(), true)
 	}

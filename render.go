@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -692,36 +693,35 @@ func render(input []byte, cfg Config) string {
 // frame wraps the lines in a border as wide as the longest one.
 // Blank lines (zero-width space) become empty lines inside the frame.
 func frame(lines []string, cfg Config) []string {
-	for _, b := range borders {
-		if b.ID != cfg.Border || len(lines) == 0 {
-			continue
-		}
-		bc := colorSpec(cfg.BorderColor)
-		edge := func(s string) string {
-			if bc == "" {
-				return dim(s)
-			}
-			return paint(s, bc)
-		}
-		w := 0
-		for _, l := range lines {
-			w = max(w, ansi.StringWidth(l))
-		}
-		bottom, right := b.B, b.R
-		if bottom == "" {
-			bottom = b.H
-		}
-		if right == "" {
-			right = b.V
-		}
-		out := []string{edge(b.TL + strings.Repeat(b.H, w+2) + b.TR)}
-		for _, l := range lines {
-			if l == "\u200b" {
-				l = ""
-			}
-			out = append(out, edge(b.V)+" "+l+strings.Repeat(" ", w-ansi.StringWidth(l))+" "+edge(right))
-		}
-		return append(out, edge(b.BL+strings.Repeat(bottom, w+2)+b.BR))
+	i := slices.IndexFunc(borders, func(b border) bool { return b.ID == cfg.Border })
+	if i < 0 || len(lines) == 0 {
+		return lines
 	}
-	return lines
+	b := borders[i]
+	bc := colorSpec(cfg.BorderColor)
+	edge := func(s string) string {
+		if bc == "" {
+			return dim(s)
+		}
+		return paint(s, bc)
+	}
+	w := 0
+	for _, l := range lines {
+		w = max(w, ansi.StringWidth(l))
+	}
+	bottom, right := b.B, b.R
+	if bottom == "" {
+		bottom = b.H
+	}
+	if right == "" {
+		right = b.V
+	}
+	out := []string{edge(b.TL + strings.Repeat(b.H, w+2) + b.TR)}
+	for _, l := range lines {
+		if l == "\u200b" {
+			l = ""
+		}
+		out = append(out, edge(b.V)+" "+l+strings.Repeat(" ", w-ansi.StringWidth(l))+" "+edge(right))
+	}
+	return append(out, edge(b.BL+strings.Repeat(bottom, w+2)+b.BR))
 }

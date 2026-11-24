@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -372,10 +373,8 @@ func barLabel(id string) string {
 	if id == "" {
 		id = "blocks"
 	}
-	for _, b := range barStyles {
-		if b.ID == id {
-			return b.Label
-		}
+	if i := slices.IndexFunc(barStyles, func(b barStyle) bool { return b.ID == id }); i >= 0 {
+		return barStyles[i].Label
 	}
 	return id
 }

@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"math/rand/v2"
+	"slices"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -92,10 +93,7 @@ func randomConfig(r *rand.Rand) Config {
 		cfg.Border = pick([]string{"rounded", "square"})
 	}
 	if len(rows) > 1 && chance(0.5) {
-		cfg.Gaps = make([]bool, len(rows)-1)
-		for i := range cfg.Gaps {
-			cfg.Gaps[i] = true
-		}
+		cfg.Gaps = slices.Repeat([]bool{true}, len(rows)-1)
 	}
 	lastRight := chance(0.3)
 	for _, row := range rows {
